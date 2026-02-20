@@ -28,21 +28,8 @@ fi
 
 # 3. Installa dipendenze sistema
 info "Verifica e installazione dipendenze sistema..."
-DEPENDENCIES=(tmux jq git yazi node ghostty gh ffmpeg)
+DEPENDENCIES=(tmux jq git yazi node gh ffmpeg)
 MISSING=()
-
-# Whisper.cpp (per voce)
-if ! check_cmd whisper-cpp; then
-  info "Installazione whisper-cpp..."
-  brew install whisper.cpp
-fi
-
-# Gitmux (tap dedicato)
-if ! check_cmd gitmux; then
-  info "Installazione gitmux..."
-  brew tap arl/arl
-  brew install gitmux
-fi
 
 for dep in "${DEPENDENCIES[@]}"; do
   if ! check_cmd "$dep"; then
@@ -54,30 +41,65 @@ done
 
 if [[ ${#MISSING[@]} -gt 0 ]]; then
   info "Installazione mancanti: ${MISSING[*]}"
-  brew install "${MISSING[@]}"
+  brew install "${MISSING[@]}" || warn "Alcune installazioni sono fallite. Controlla manualmente."
+fi
+
+# Ghostty (Cask su macOS)
+if ! check_cmd ghostty; then
+  info "Installazione ghostty..."
+  if [[ "$(uname)" == "Darwin" ]]; then
+    brew install --cask ghostty || warn "Impossibile installare ghostty via brew cask."
+  else
+    warn "Installa ghostty manualmente per il tuo sistema."
+  fi
+fi
+
+# Gitmux (tap dedicato)
+if ! check_cmd gitmux; then
+  info "Installazione gitmux..."
+  brew tap arl/arl
+  brew install gitmux || warn "Impossibile installare gitmux."
+fi
+
+# Whisper.cpp (per voce)
+if ! check_cmd whisper-cpp; then
+  info "Installazione whisper-cpp..."
+  brew install whisper-cpp || warn "Impossibile installare whisper-cpp."
 fi
 
 # 4. Installa Claude Code e Memoria
 if ! check_cmd claude; then
   info "Installazione Claude Code..."
-  npm install -g @anthropic-ai/claude-code
+  npm install -g @anthropic-ai/claude-code || warn "Impossibile installare Claude Code globalmente via npm."
 else
   info "Claude Code: Presente"
 fi
 
 if ! check_cmd bun; then
   info "Installazione Bun..."
-  curl -fsSL https://bun.sh/install | bash
+  curl -fsSL https://bun.sh/install | bash || warn "Impossibile installare Bun."
 fi
 
 if ! check_cmd uv; then
   info "Installazione uv..."
-  curl -LsSf https://astral.sh/uv/install.sh | sh
+  curl -LsSf https://astral.sh/uv/install.sh | sh || warn "Impossibile installare uv."
+fi
+
+# claude-monitor: monitor utilizzo Claude Code (token, burn rate, predizioni)
+if ! check_cmd claude-monitor && ! check_cmd ccm; then
+  info "Installazione claude-monitor..."
+  if check_cmd uv; then
+    uv tool install claude-monitor || warn "Impossibile installare claude-monitor. Riprova con: uv tool install claude-monitor"
+  else
+    warn "uv non disponibile. Installa claude-monitor manualmente: uv tool install claude-monitor"
+  fi
+else
+  info "claude-monitor: Presente"
 fi
 
 if ! check_cmd perplexity; then
   info "Installazione Perplexity CLI..."
-  npm install -g perplexity-cli || true
+  npm install -g perplexity-cli || warn "Impossibile installare Perplexity CLI."
 fi
 
 # 5. Build Server MCP BigIDE
