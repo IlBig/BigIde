@@ -3,10 +3,7 @@
 modal = false
 show_selection_mark = true
 default_flags = "sg"
-
-# Icone Nerd Font (come VSCode Material Icons)
-[icon_theme]
-name = "nerdfont"
+icon_theme = "nerdfont"
 
 # Colori — VSCode dark theme
 [skin]
