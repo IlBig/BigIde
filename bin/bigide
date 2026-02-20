@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+export BIGIDE_REPO_ROOT="$REPO_ROOT"
+
+source "$REPO_ROOT/src/shell/lib/common.sh"
+source "$REPO_ROOT/src/shell/lib/setup-runtime.sh"
+source "$REPO_ROOT/src/shell/lib/splash.sh"
+source "$REPO_ROOT/src/shell/lib/session.sh"
+source "$REPO_ROOT/src/shell/lib/layout.sh"
+source "$REPO_ROOT/src/shell/lib/deps.sh"
+source "$REPO_ROOT/src/shell/lib/repair.sh"
+source "$REPO_ROOT/src/shell/lib/update.sh"
+source "$REPO_ROOT/src/shell/lib/ccproxy.sh"
+
+usage() {
+  cat <<'TXT'
+Usage:
+  bigide [project_path]
+  bigide --repair
+  bigide --update
+  bigide --install-ccproxy
+TXT
+}
+
+case "${1:-}" in
+  --repair)
+    init_runtime
+    repair_runtime
+    exit 0
+    ;;
+  --update)
+    init_runtime
+    update_bigide
+    exit 0
+    ;;
+  --install-ccproxy)
+    init_runtime
+    if ensure_ccproxy; then
+      log "INFO" "ccproxy pronto: $(ccproxy_bin_path)"
+      exit 0
+    fi
+    die "Impossibile installare ccproxy automaticamente"
+    ;;
+  --help|-h)
+    usage
+    exit 0
+    ;;
+esac
+
+PROJECT_PATH="${1:-$PWD}"
+SESSION_NAME="$(session_name_for_path "$PROJECT_PATH")"
+
+show_splash "Verifica dipendenze" 10
+check_dependencies
+show_splash "Inizializzazione runtime" 35
+init_runtime
+
+if session_exists "$SESSION_NAME"; then
+  show_splash "Aggancio sessione esistente" 80
+  end_splash
+  exec tmux attach -t "$SESSION_NAME"
+fi
+
+show_splash "Creazione nuova sessione" 60
+tmux new-session -d -s "$SESSION_NAME" -c "$PROJECT_PATH"
+show_splash "Creazione layout" 85
+create_layout "$SESSION_NAME"
+show_splash "Pronto" 100
+end_splash
+exec tmux attach -t "$SESSION_NAME"

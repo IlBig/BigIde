@@ -1,0 +1,20 @@
+{
+  "version": 1,
+  "theme": "tokyonight-night",
+  "layout": "default",
+  "browserLayout": "split",
+  "refresh": {
+    "statusSeconds": 5,
+    "monitorSeconds": 10
+  },
+  "mcp": {
+    "promptRegex": "[$#>] $",
+    "defaultCaptureLines": 50,
+    "waitTimeoutMs": 5000
+  },
+  "ccproxy": {
+    "mode": "auto",
+    "transparent": true,
+    "repo": "https://github.com/starbased-co/ccproxy"
+  }
+}
