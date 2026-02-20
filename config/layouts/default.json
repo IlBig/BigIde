@@ -5,6 +5,5 @@
     { "id": "claude",  "role": "agent",           "widthPercent": 85, "heightPercent": 65 },
     { "id": "monitor", "role": "usage-monitor",   "widthPercent": 15, "heightPercent": 35 },
     { "id": "terminal","role": "terminal",        "widthPercent": 85, "heightPercent": 35 }
-  ],
-  "gitBar": { "enabled": true, "heightRows": 1 }
+  ]
 }
