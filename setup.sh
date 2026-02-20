@@ -75,6 +75,11 @@ if ! check_cmd uv; then
   curl -LsSf https://astral.sh/uv/install.sh | sh
 fi
 
+if ! check_cmd perplexity; then
+  info "Installazione Perplexity CLI..."
+  npm install -g perplexity-cli || true
+fi
+
 # 5. Build Server MCP BigIDE
 info "Build server MCP..."
 cd "$SCRIPT_DIR/src/mcp"
@@ -100,8 +105,13 @@ cp -n "$SCRIPT_DIR/config/default-config.json" ~/.bigide/config.json || true
 cp -f "$SCRIPT_DIR/config/tmux.conf" ~/.bigide/tmux/tmux.conf
 cp -r "$SCRIPT_DIR/config/layouts" ~/.bigide/
 cp -r "$SCRIPT_DIR/src/shell/scripts" ~/.bigide/
+cp -r "$SCRIPT_DIR/config/nvim" ~/.bigide/
 chmod +x ~/.bigide/scripts/*.sh
 cp -f "$SCRIPT_DIR/config/gitmux.conf" ~/.bigide/gitmux.conf 2>/dev/null || true
+
+# 7. Registra alias e env vars
+# L'utente dovrebbe usare NVIM_APPNAME=bigide per questo config
+
 
 # Copia MCP build
 rm -rf ~/.bigide/mcp/dist

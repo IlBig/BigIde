@@ -2,7 +2,9 @@
 set -euo pipefail
 
 load_layout_vars() {
-  local layout_file="$BIGIDE_HOME/layouts/default.json"
+  local layout_name="${1:-default}"
+  local layout_file="$BIGIDE_HOME/layouts/${layout_name}.json"
+  [[ -f "$layout_file" ]] || layout_file="$BIGIDE_HOME/layouts/default.json"
   [[ -f "$layout_file" ]] || die "Layout non trovato: $layout_file"
 
   yazi_width="$(jq -r '.panes[] | select(.id=="yazi") | .widthPercent' "$layout_file")"
@@ -24,12 +26,11 @@ load_layout_vars() {
 
 create_layout() {
   local session_name="$1"
+  local layout_name="${2:-default}"
   local top_pane_id left_top_id right_top_id left_bottom_id right_bottom_id log_pane_id terminal_pane_id git_bar_id
   local terminal_share_right
 
-  load_layout_vars
-
-  terminal_share_right=$(( terminal_width * 100 / (terminal_width + log_width) ))
+  load_layout_vars "$layout_name"
 
   tmux rename-window -t "$session_name":0 "main"
 
@@ -47,7 +48,7 @@ create_layout() {
 
   tmux send-keys -t "$left_top_id" 'YAZI_CONFIG_HOME="$HOME/.bigide/yazi" yazi' C-m
   tmux send-keys -t "$right_top_id" '$HOME/.bigide/scripts/launch-claude.sh' C-m
-  tmux send-keys -t "$left_bottom_id" 'claude-monitor --plan max5 --theme dark --refresh-rate 10 || bash' C-m
+  tmux send-keys -t "$left_bottom_id" '$HOME/.bigide/scripts/monitor.sh || bash' C-m
   tmux send-keys -t "$log_pane_id" 'tail -f /dev/null' C-m
   tmux send-keys -t "$terminal_pane_id" 'zsh' C-m
   tmux send-keys -t "$git_bar_id" 'gitmux -cfg "$HOME/.bigide/gitmux.conf" || bash' C-m

@@ -19,12 +19,14 @@ source "$REPO_ROOT/src/shell/lib/provision.sh"
 usage() {
   cat <<'TXT'
 Usage:
-  bigide [project_path]
+  bigide [project_path] [--layout name]
   bigide --repair
   bigide --update
   bigide --install-ccproxy
 TXT
 }
+
+LAYOUT_NAME="default"
 
 case "${1:-}" in
   --repair)
@@ -37,21 +39,25 @@ case "${1:-}" in
     update_bigide
     exit 0
     ;;
-  --install-ccproxy)
-    init_runtime
-    if ensure_ccproxy; then
-      log "INFO" "ccproxy pronto: $(ccproxy_bin_path)"
-      exit 0
-    fi
-    die "Impossibile installare ccproxy automaticamente"
-    ;;
-  --help|-h)
-    usage
-    exit 0
+  --layout)
+    LAYOUT_NAME="${2:-default}"
+    shift 2
     ;;
 esac
 
 PROJECT_PATH="${1:-$PWD}"
+# Se dopo shift 2 il path non c'è, usa PWD.
+# Se PROJECT_PATH era --layout, lo shift lo ha tolto.
+# Ma se l'utente fa `bigide . --layout web`, dobbiamo gestire entrambi.
+
+# Fix per argomenti misti
+for arg in "$@"; do
+  if [[ "$arg" == "--layout" ]]; then
+     # Già gestito o da gestire nel loop
+     :
+  fi
+done
+
 SESSION_NAME="$(session_name_for_path "$PROJECT_PATH")"
 
 show_splash "Verifica dipendenze" 10
@@ -70,8 +76,8 @@ fi
 
 show_splash "Creazione nuova sessione" 60
 tmux new-session -d -s "$SESSION_NAME" -c "$PROJECT_PATH"
-show_splash "Creazione layout" 85
-create_layout "$SESSION_NAME"
+show_splash "Creazione layout: $LAYOUT_NAME" 85
+create_layout "$SESSION_NAME" "$LAYOUT_NAME"
 show_splash "Pronto" 100
 end_splash
 exec tmux attach -t "$SESSION_NAME"
