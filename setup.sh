@@ -28,7 +28,7 @@ fi
 
 # 3. Installa dipendenze sistema
 info "Verifica e installazione dipendenze sistema..."
-DEPENDENCIES=(tmux jq git yazi node gh ffmpeg)
+DEPENDENCIES=(tmux jq git yazi broot node gh ffmpeg)
 MISSING=()
 
 for dep in "${DEPENDENCIES[@]}"; do

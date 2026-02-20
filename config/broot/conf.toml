@@ -1,0 +1,71 @@
+# BigIDE broot config — VSCode-like tree explorer
+
+modal = false
+show_selection_mark = true
+default_flags = "sg"
+
+# Icone Nerd Font (come VSCode Material Icons)
+[icon_theme]
+name = "nerdfont"
+
+# Colori — VSCode dark theme
+[skin]
+default                = "gray(21) none"
+selected_line          = "rgb(40,79,120) none bold"
+tree                   = "gray(14) none"
+file                   = "gray(20) none"
+directory              = "rgb(97,175,239) none bold"
+exe                    = "rgb(100,215,100) none"
+link                   = "rgb(60,200,160) none"
+pruning                = "gray(15) none italic"
+perm__                 = "gray(11) none"
+perm_r                 = "rgb(220,180,60) none"
+perm_w                 = "rgb(200,100,100) none"
+perm_x                 = "rgb(100,200,100) none"
+dates                  = "gray(14) none"
+char_match             = "rgb(229,192,123) none bold"
+file_error             = "rgb(224,108,117) none"
+flag_label             = "gray(16) none"
+flag_value             = "rgb(97,175,239) none bold"
+input                  = "gray(22) none"
+status_error           = "rgb(224,108,117) gray(3) bold"
+status_job             = "rgb(100,215,100) gray(3) bold"
+status_normal          = "gray(18) gray(3)"
+status_italic          = "rgb(97,175,239) gray(3) italic"
+status_bold            = "gray(21) gray(3) bold"
+status_code            = "gray(17) gray(3)"
+status_ellipsis        = "gray(18) gray(3)"
+scrollbar_track        = "gray(6) none"
+scrollbar_thumb        = "gray(14) none"
+# Git status colors
+git_branch             = "rgb(97,175,239) none bold"
+git_unstaged           = "rgb(224,108,117) none"
+git_staged             = "rgb(152,195,121) none bold"
+git_conflict           = "rgb(224,108,117) none bold"
+git_ignored            = "gray(13) none"
+git_untracked          = "rgb(229,192,123) none"
+
+# Verbs (azioni tastiera)
+[[verbs]]
+key        = "enter"
+execution  = "{default_verb}"
+
+[[verbs]]
+invocation = "edit"
+shortcut   = "e"
+key        = "F2"
+execution  = "NVIM_APPNAME=bigide nvim {file}"
+leave_broot = false
+
+[[verbs]]
+key        = "ctrl-e"
+execution  = "NVIM_APPNAME=bigide nvim {file}"
+leave_broot = false
+
+[[verbs]]
+key        = "ctrl-h"
+execution  = ":toggle_hidden"
+
+[[verbs]]
+key        = "ctrl-g"
+execution  = ":toggle_git_ignore"
