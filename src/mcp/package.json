@@ -5,6 +5,17 @@
   "type": "module",
   "main": "src/index.js",
   "scripts": {
-    "check": "node --check src/index.js && node --check src/tools/capture.js && node --check src/tools/send.js && node --check src/tools/list.js && node --check src/tools/browser.js"
+    "check": "node --check src/index.js && node --check src/tools/capture.js && node --check src/tools/send.js && node --check src/tools/list.js && node --check src/tools/browser.js",
+    "build": "tsc"
+  },
+  "description": "",
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.26.0",
+    "@types/node": "^25.3.0",
+    "typescript": "^5.9.3",
+    "zod": "^4.3.6"
   }
 }
