@@ -1,18 +1,46 @@
 #!/usr/bin/env bash
+set -euo pipefail
 
-# Placeholder per claude-monitor
-# Mostra risorse e stato tmux
+# Se claude-monitor è installato, usalo
+if command -v claude-monitor >/dev/null 2>&1; then
+  exec claude-monitor --plan max5 --theme dark --refresh-rate 10
+fi
 
+# Colori
+CYAN='\033[0;36m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m'
+
+# Fallback: monitor compatto (ottimizzato per pane piccoli)
 while true; do
   clear
-  echo "=== BigIDE System Monitor ==="
-  echo "Date: $(date)"
+  echo -e "${CYAN}  BIGIDE MONITOR  ${NC}${YELLOW}$(date '+%H:%M:%S')${NC}"
   echo
-  echo "--- System Resources ---"
-  top -l 1 -n 0 -s 0 | grep -E "CPU usage|PhysMem"
-  echo
-  echo "--- Active Panes ---"
-  tmux list-panes -a -F "#{session_name}:#{window_index}.#{pane_index} (#{pane_width}x#{pane_height}) - #{pane_current_command}" | head -n 10
-  
+
+  # CPU
+  if [[ "$(uname)" == "Darwin" ]]; then
+    cpu=$(ps -A -o %cpu | awk '{s+=$1} END {printf "%.1f%%", s}')
+  else
+    cpu=$(top -bn1 | grep "Cpu(s)" | awk '{printf "%.1f%%", $2+$4}')
+  fi
+  echo -e " ${GREEN}CPU${NC}  $cpu"
+
+  # RAM
+  if [[ "$(uname)" == "Darwin" ]]; then
+    vm_stat | awk '
+      /Pages free/                   {free=$3}
+      /Pages active/                 {active=$3}
+      /Pages wired down/             {wired=$3}
+      /Pages occupied by compressor/ {comp=$3}
+      END {
+        gsub(/\./,"",free); gsub(/\./,"",active); gsub(/\./,"",wired); gsub(/\./,"",comp)
+        used=(active+wired+comp)*4096/1024/1024/1024
+        printf " \033[0;32mRAM\033[0m  %.1f GB\n", used
+      }'
+  else
+    free -h | awk '/Mem:/ {printf " \033[0;32mRAM\033[0m  %s / %s\n", $3, $2}'
+  fi
+
   sleep 5
 done
