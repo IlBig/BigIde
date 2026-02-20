@@ -22,13 +22,16 @@ load_layout_vars() {
   [[ "$log_width" =~ ^[0-9]+$ ]] || die "Valore log width non valido"
   [[ "$terminal_width" =~ ^[0-9]+$ ]] || die "Valore terminal width non valido"
   [[ "$git_bar_rows" =~ ^[0-9]+$ ]] || die "Valore git bar rows non valido"
+
+  # Calcola la quota del terminale rispetto all'area log+terminal
+  terminal_share_right=$(( (terminal_width * 100) / (log_width + terminal_width) ))
 }
 
 create_layout() {
   local session_name="$1"
   local layout_name="${2:-default}"
   local top_pane_id left_top_id right_top_id left_bottom_id right_bottom_id log_pane_id terminal_pane_id git_bar_id
-  local terminal_share_right
+  # terminal_share_right è globale o settata da load_layout_vars
 
   load_layout_vars "$layout_name"
 
@@ -46,12 +49,18 @@ create_layout() {
   terminal_pane_id="$(tmux split-window -h -p "$terminal_share_right" -t "$right_bottom_id" -P -F '#{pane_id}')"
   log_pane_id="$right_bottom_id"
 
-  tmux send-keys -t "$left_top_id" 'YAZI_CONFIG_HOME="$HOME/.bigide/yazi" yazi' C-m
-  tmux send-keys -t "$right_top_id" '$HOME/.bigide/scripts/launch-claude.sh' C-m
-  tmux send-keys -t "$left_bottom_id" '$HOME/.bigide/scripts/monitor.sh || bash' C-m
-  tmux send-keys -t "$log_pane_id" 'tail -f /dev/null' C-m
-  tmux send-keys -t "$terminal_pane_id" 'zsh' C-m
-  tmux send-keys -t "$git_bar_id" 'gitmux -cfg "$HOME/.bigide/gitmux.conf" || bash' C-m
+  # Piccola pausa per assicurarsi che i pannelli siano pronti
+  sleep 1
+
+  # Pulizia e avvio strumenti
+  tmux send-keys -t "$left_top_id" 'clear; YAZI_CONFIG_HOME="$HOME/.bigide/yazi" yazi' C-m
+  tmux send-keys -t "$right_top_id" 'clear; $HOME/.bigide/scripts/launch-claude.sh' C-m
+  tmux send-keys -t "$left_bottom_id" 'clear; $HOME/.bigide/scripts/monitor.sh || zsh' C-m
+  tmux send-keys -t "$log_pane_id" 'clear; tail -f /dev/null' C-m
+  tmux send-keys -t "$terminal_pane_id" 'clear; zsh' C-m
+  
+  # Git Bar: status git con ANSI diretto (gitmux è per status bar, non per pane)
+  tmux send-keys -t "$git_bar_id" '$HOME/.bigide/scripts/git-bar.sh' C-m
 
   tmux select-pane -t "$right_top_id"
 }

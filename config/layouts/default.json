@@ -3,9 +3,9 @@
   "panes": [
     { "id": "yazi", "role": "file-browser", "widthPercent": 25, "heightPercent": 70 },
     { "id": "claude", "role": "agent", "widthPercent": 75, "heightPercent": 70 },
-    { "id": "monitor", "role": "usage-monitor", "widthPercent": 15, "heightPercent": 30 },
-    { "id": "log", "role": "log", "widthPercent": 35, "heightPercent": 30 },
-    { "id": "terminal", "role": "terminal", "widthPercent": 50, "heightPercent": 30 }
+    { "id": "monitor", "role": "usage-monitor", "widthPercent": 15, "heightPercent": 35 },
+    { "id": "log", "role": "log", "widthPercent": 35, "heightPercent": 35 },
+    { "id": "terminal", "role": "terminal", "widthPercent": 50, "heightPercent": 35 }
   ],
   "gitBar": { "enabled": true, "heightRows": 1 }
 }
