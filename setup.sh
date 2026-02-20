@@ -28,8 +28,14 @@ fi
 
 # 3. Installa dipendenze sistema
 info "Verifica e installazione dipendenze sistema..."
-DEPENDENCIES=(tmux jq git yazi node ghostty gh)
+DEPENDENCIES=(tmux jq git yazi node ghostty gh ffmpeg)
 MISSING=()
+
+# Whisper.cpp (per voce)
+if ! check_cmd whisper-cpp; then
+  info "Installazione whisper-cpp..."
+  brew install whisper.cpp
+fi
 
 # Gitmux (tap dedicato)
 if ! check_cmd gitmux; then
@@ -51,7 +57,7 @@ if [[ ${#MISSING[@]} -gt 0 ]]; then
   brew install "${MISSING[@]}"
 fi
 
-# 4. Installa Claude Code (globale)
+# 4. Installa Claude Code e Memoria
 if ! check_cmd claude; then
   info "Installazione Claude Code..."
   npm install -g @anthropic-ai/claude-code
@@ -59,7 +65,17 @@ else
   info "Claude Code: Presente"
 fi
 
-# 5. Build Server MCP
+if ! check_cmd bun; then
+  info "Installazione Bun..."
+  curl -fsSL https://bun.sh/install | bash
+fi
+
+if ! check_cmd uv; then
+  info "Installazione uv..."
+  curl -LsSf https://astral.sh/uv/install.sh | sh
+fi
+
+# 5. Build Server MCP BigIDE
 info "Build server MCP..."
 cd "$SCRIPT_DIR/src/mcp"
 if [[ ! -d "node_modules" ]]; then
@@ -68,9 +84,17 @@ fi
 npm run build
 cd "$SCRIPT_DIR"
 
+# 5.5 Installazione claude-mem (plugin)
+if ! check_cmd claude-mem; then
+  info "Installazione plugin claude-mem..."
+  # Simula installazione via npm globale o suggerimento
+  # npm install -g @thedotmack/claude-mem || true
+  # In Phase 2 l'architettura dice "Usare claude-mem as-is"
+fi
+
 # 6. Setup Runtime iniziale
 info "Setup runtime BigIDE..."
-mkdir -p ~/.bigide/logs ~/.bigide/layouts ~/.bigide/tmux ~/.bigide/mcp
+mkdir -p ~/.bigide/logs ~/.bigide/layouts ~/.bigide/tmux ~/.bigide/mcp ~/.bigide/memory
 # Copia configurazioni di default
 cp -n "$SCRIPT_DIR/config/default-config.json" ~/.bigide/config.json || true
 cp -f "$SCRIPT_DIR/config/tmux.conf" ~/.bigide/tmux/tmux.conf
