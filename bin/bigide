@@ -14,6 +14,7 @@ source "$REPO_ROOT/src/shell/lib/deps.sh"
 source "$REPO_ROOT/src/shell/lib/repair.sh"
 source "$REPO_ROOT/src/shell/lib/update.sh"
 source "$REPO_ROOT/src/shell/lib/ccproxy.sh"
+source "$REPO_ROOT/src/shell/lib/provision.sh"
 
 usage() {
   cat <<'TXT'
@@ -57,6 +58,9 @@ show_splash "Verifica dipendenze" 10
 check_dependencies
 show_splash "Inizializzazione runtime" 35
 init_runtime
+
+# 1.5 Auto-provisioning
+check_auto_provision "$PROJECT_PATH"
 
 if session_exists "$SESSION_NAME"; then
   show_splash "Aggancio sessione esistente" 80
