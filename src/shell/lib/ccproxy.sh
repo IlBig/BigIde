@@ -72,7 +72,9 @@ launch_claude_with_proxy() {
     exec claude
   fi
 
-  if ensure_ccproxy; then
+  # In modalità auto: usa ccproxy solo se già installato, senza tentare install
+  # Per installare ccproxy usa: bigide --install-ccproxy
+  if ccproxy_bin_path >/dev/null 2>&1; then
     ccproxy_path="$(ccproxy_bin_path)"
 
     if "$ccproxy_path" --help 2>&1 | grep -q " claude"; then
@@ -87,10 +89,8 @@ launch_claude_with_proxy() {
       "$ccproxy_path" start >/dev/null 2>&1 || true
       exec claude
     fi
-
-    log "WARN" "ccproxy trovato ma interfaccia non riconosciuta, uso Claude diretto"
-    exec claude
   fi
 
+  # ccproxy non installato o non riconosciuto: Claude diretto (silenzioso)
   exec claude
 }
