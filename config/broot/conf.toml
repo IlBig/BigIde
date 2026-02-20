@@ -1,8 +1,9 @@
 # BigIDE broot config — VSCode-like tree explorer
 
 modal = false
-show_selection_mark = true
-default_flags = "sg"
+show_selection_mark = false
+default_flags = "g"
+show_root_fs = false
 icon_theme = "nerdfont"
 
 # Colori — VSCode dark theme
