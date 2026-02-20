@@ -1,9 +1,8 @@
 {
   "name": "default",
   "panes": [
-    { "id": "yazi",    "role": "file-browser",   "widthPercent": 10, "heightPercent": 65 },
-    { "id": "claude",  "role": "agent",           "widthPercent": 90, "heightPercent": 65 },
-    { "id": "monitor", "role": "usage-monitor",   "widthPercent": 10, "heightPercent": 35 },
-    { "id": "terminal","role": "terminal",        "widthPercent": 90, "heightPercent": 35 }
+    { "id": "yazi",    "role": "file-browser",   "widthPercent": 5,  "heightPercent": 65 },
+    { "id": "claude",  "role": "agent",           "widthPercent": 95, "heightPercent": 65 },
+    { "id": "terminal","role": "terminal",        "widthPercent": 95, "heightPercent": 35 }
   ]
 }

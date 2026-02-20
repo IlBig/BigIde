@@ -85,18 +85,6 @@ if ! check_cmd uv; then
   curl -LsSf https://astral.sh/uv/install.sh | sh || warn "Impossibile installare uv."
 fi
 
-# claude-monitor: monitor utilizzo Claude Code (token, burn rate, predizioni)
-if ! check_cmd claude-monitor && ! check_cmd ccm; then
-  info "Installazione claude-monitor..."
-  if check_cmd uv; then
-    uv tool install claude-monitor || warn "Impossibile installare claude-monitor. Riprova con: uv tool install claude-monitor"
-  else
-    warn "uv non disponibile. Installa claude-monitor manualmente: uv tool install claude-monitor"
-  fi
-else
-  info "claude-monitor: Presente"
-fi
-
 if ! check_cmd perplexity; then
   info "Installazione Perplexity CLI..."
   npm install -g perplexity-cli || warn "Impossibile installare Perplexity CLI."
