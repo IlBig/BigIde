@@ -28,7 +28,7 @@ fi
 
 # 3. Installa dipendenze sistema
 info "Verifica e installazione dipendenze sistema..."
-DEPENDENCIES=(tmux jq git yazi broot node gh ffmpeg)
+DEPENDENCIES=(tmux jq git yazi neovim node gh ffmpeg)
 MISSING=()
 
 for dep in "${DEPENDENCIES[@]}"; do
@@ -115,9 +115,19 @@ cp -n "$SCRIPT_DIR/config/default-config.json" ~/.bigide/config.json || true
 cp -f "$SCRIPT_DIR/config/tmux.conf" ~/.bigide/tmux/tmux.conf
 cp -r "$SCRIPT_DIR/config/layouts" ~/.bigide/
 cp -r "$SCRIPT_DIR/src/shell/scripts" ~/.bigide/
-cp -r "$SCRIPT_DIR/config/nvim" ~/.bigide/
 chmod +x ~/.bigide/scripts/*.sh
 cp -f "$SCRIPT_DIR/config/gitmux.conf" ~/.bigide/gitmux.conf 2>/dev/null || true
+
+# Neovim/LazyVim config — NVIM_APPNAME=bigide legge da ~/.config/bigide/
+NVIM_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/bigide"
+info "Copia config Neovim in $NVIM_CONFIG_DIR..."
+mkdir -p "$NVIM_CONFIG_DIR"
+cp -r "$SCRIPT_DIR/config/nvim/." "$NVIM_CONFIG_DIR/"
+
+# Pre-installa plugin LazyVim in modalità headless (prima esecuzione silenziosa)
+info "Installazione plugin LazyVim (neo-tree, telescope, ecc.)..."
+NVIM_APPNAME=bigide nvim --headless "+Lazy! sync" +qa 2>/dev/null \
+  || warn "Installazione plugin LazyVim non completata. Verrà completata al primo avvio."
 
 # 7. Registra alias e env vars
 # L'utente dovrebbe usare NVIM_APPNAME=bigide per questo config
