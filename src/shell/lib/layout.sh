@@ -66,7 +66,13 @@ create_layout() {
   tmux send-keys -t "$left_top_id"      'clear; $HOME/.bigide/scripts/filetree.sh' C-m
   tmux send-keys -t "$right_top_id"     'clear; $HOME/.bigide/scripts/launch-claude.sh' C-m
   tmux send-keys -t "$terminal_pane_id" 'clear; zsh' C-m
-  tmux send-keys -t "$gitbar_pane"      "exec bash \$HOME/.bigide/scripts/git-bar.sh $(tmux display-message -p -t "$session_name":0.0 '#{pane_current_path}')" C-m
+  local project_path
+  project_path="$(tmux display-message -p -t "${session_name}:0.0" '#{pane_current_path}')"
+  tmux send-keys -t "$gitbar_pane" "while true; do bash \$HOME/.bigide/scripts/git-bar.sh '${project_path}' 2>/dev/null; sleep 2; done" C-m
+
+  # Hook: mantieni filetree 40 col e gitbar 1 riga dopo ogni resize terminale
+  tmux set-hook -t "$session_name" client-resized \
+    "run-shell 'tmux resize-pane -t ${session_name}:0.0 -x 40 2>/dev/null; tmux resize-pane -t ${session_name}:0.3 -y 1 2>/dev/null; true'"
 
   # Seleziona claude come pane attivo
   tmux select-pane -t "$right_top_id"

@@ -5,9 +5,9 @@
 
 PROJECT_DIR="${1:-$PWD}"
 
-tput civis 2>/dev/null || true   # nasconde cursore
-stty -echo 2>/dev/null || true   # disabilita echo input
-trap 'tput cnorm 2>/dev/null; stty echo 2>/dev/null; exit 0' INT TERM EXIT
+tput civis 2>/dev/null || true    # nasconde cursore
+stty -echo 2>/dev/null || true    # disabilita echo input
+trap 'tput civis 2>/dev/null; true' INT TERM  # non esce mai sul segnale
 
 show_git() {
   tput cup 0 0 2>/dev/null || printf '\033[H'
