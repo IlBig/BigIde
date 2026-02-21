@@ -15,6 +15,7 @@ background-blur-radius = 15
 # ─── Finestra ────────────────────────────────────────────────────────────────
 title = BigIDE
 confirm-close-surface = false
+fullscreen = true
 
 # ─── Shell integration ────────────────────────────────────────────────────────
 shell-integration = detect
