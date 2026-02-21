@@ -57,8 +57,11 @@ create_layout() {
   right_top_id="$(tmux split-window -h -p "$claude_width" -t "$full_pane" -P -F '#{pane_id}')"
   left_top_id="$full_pane"
 
-  # 3. Split verticale colonna destra: claude (alto) | terminal (basso)
+  # 3. Split verticale colonna destra: claude (alto) | area-bassa (basso)
   terminal_pane_id="$(tmux split-window -v -p "$lower_height" -t "$right_top_id" -P -F '#{pane_id}')"
+
+  # 4. Split orizzontale area-bassa: terminal (sx) | logs (dx)
+  logs_pane_id="$(tmux split-window -h -p 50 -t "$terminal_pane_id" -P -F '#{pane_id}')"
 
   sleep 1
 
@@ -66,6 +69,7 @@ create_layout() {
   tmux send-keys -t "$left_top_id"      'clear; $HOME/.bigide/scripts/filetree.sh' C-m
   tmux send-keys -t "$right_top_id"     'clear; $HOME/.bigide/scripts/launch-claude.sh' C-m
   tmux send-keys -t "$terminal_pane_id" 'clear; zsh' C-m
+  tmux send-keys -t "$logs_pane_id"     'clear; zsh' C-m
   local project_path
   project_path="$(tmux display-message -p -t "${session_name}:0.0" '#{pane_current_path}')"
   tmux send-keys -t "$gitbar_pane" "while true; do bash \$HOME/.bigide/scripts/git-bar.sh '${project_path}' 2>/dev/null; sleep 2; done" C-m

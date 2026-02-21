@@ -1,9 +1,10 @@
 {
   "name": "default",
   "panes": [
-    { "id": "yazi",    "role": "file-browser",   "widthPercent": 19, "widthColumns": 40, "heightPercent": 65 },
-    { "id": "claude",  "role": "agent",           "widthPercent": 80, "heightPercent": 65 },
-    { "id": "terminal","role": "terminal",        "widthPercent": 80, "heightPercent": 35 },
-    { "id": "gitbar",  "role": "status",          "heightLines": 1 }
+    { "id": "yazi",    "role": "file-browser", "widthPercent": 19, "widthColumns": 40, "heightPercent": 65 },
+    { "id": "claude",  "role": "agent",         "widthPercent": 80, "heightPercent": 65 },
+    { "id": "terminal","role": "terminal",      "widthPercent": 50, "heightPercent": 35 },
+    { "id": "logs",    "role": "logs",          "widthPercent": 50 },
+    { "id": "gitbar",  "role": "status",        "heightLines": 1 }
   ]
 }
