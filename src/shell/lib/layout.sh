@@ -8,6 +8,7 @@ load_layout_vars() {
   [[ -f "$layout_file" ]] || die "Layout non trovato: $layout_file"
 
   yazi_width="$(jq -r '.panes[] | select(.id=="yazi") | .widthPercent' "$layout_file")"
+  yazi_cols="$(jq -r '.panes[] | select(.id=="yazi") | .widthColumns // empty' "$layout_file")"
   claude_width="$(jq -r '.panes[] | select(.id=="claude") | .widthPercent' "$layout_file")"
   lower_height="$(jq -r '.panes[] | select(.id=="terminal") | .heightPercent' "$layout_file")"
 
@@ -21,10 +22,16 @@ apply_layout_resize() {
   local layout_name="${2:-default}"
   load_layout_vars "$layout_name"
 
-  local total_cols
-  total_cols=$(tmux display-message -p -t "${session_name}:0" "#{window_width}" 2>/dev/null) || return 0
-  local tree_cols=$(( total_cols * yazi_width / 100 ))
-  [[ "$tree_cols" -lt 5 ]] && tree_cols=5
+  local tree_cols
+  # Usa colonne assolute se definite, altrimenti percentuale
+  if [[ -n "${yazi_cols:-}" && "$yazi_cols" =~ ^[0-9]+$ ]]; then
+    tree_cols="$yazi_cols"
+  else
+    local total_cols
+    total_cols=$(tmux display-message -p -t "${session_name}:0" "#{window_width}" 2>/dev/null) || return 0
+    tree_cols=$(( total_cols * yazi_width / 100 ))
+    [[ "$tree_cols" -lt 5 ]] && tree_cols=5
+  fi
 
   # Pane 0 = file tree (pane più a sinistra nella finestra 0)
   tmux resize-pane -t "${session_name}:0.0" -x "$tree_cols" 2>/dev/null || true

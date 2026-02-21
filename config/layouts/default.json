@@ -1,7 +1,7 @@
 {
   "name": "default",
   "panes": [
-    { "id": "yazi",    "role": "file-browser",   "widthPercent": 20, "heightPercent": 65 },
+    { "id": "yazi",    "role": "file-browser",   "widthPercent": 19, "widthColumns": 40, "heightPercent": 65 },
     { "id": "claude",  "role": "agent",           "widthPercent": 80, "heightPercent": 65 },
     { "id": "terminal","role": "terminal",        "widthPercent": 80, "heightPercent": 35 }
   ]

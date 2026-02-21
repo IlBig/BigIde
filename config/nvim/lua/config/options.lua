@@ -9,13 +9,13 @@ vim.opt.laststatus   = 0
 vim.opt.showtabline  = 0
 vim.opt.cmdheight    = 0
 
--- Auto-apri neo-tree all'avvio (pcall: non crasha se plugin mancante)
+-- Auto-apri neo-tree all'avvio — NON in modalità preview (BIGIDE_PREVIEW=1)
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = function()
+    if vim.env.BIGIDE_PREVIEW == "1" then return end
     vim.schedule(function()
       local ok, cmd = pcall(require, "neo-tree.command")
       if ok then
-        -- dir = cwd (cartella progetto impostata da filetree.sh)
         cmd.execute({ action = "show", position = "current", dir = vim.fn.getcwd() })
       end
     end)
