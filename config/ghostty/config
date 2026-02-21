@@ -4,7 +4,7 @@
 
 # ─── Font ────────────────────────────────────────────────────────────────────
 font-family = JetBrainsMono Nerd Font
-font-size = 13
+font-size = 11
 
 # ─── Sfondo ──────────────────────────────────────────────────────────────────
 # Tokyo Night Storm — allineato al tema neovim (#1e2030)

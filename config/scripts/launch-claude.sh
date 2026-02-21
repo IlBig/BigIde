@@ -37,6 +37,10 @@ if ! grep -q "tmux-mcp" "$CONFIG_FILE"; then
 fi
 
 # 2. Avvio Claude
+# Rimuove CLAUDECODE: evita errore "nested session" se BigIDE è aperto da un terminale
+# che ha già una sessione Claude attiva (es. durante sviluppo)
+unset CLAUDECODE 2>/dev/null || true
+
 if command -v claude >/dev/null 2>&1; then
   clear
   launch_claude_with_proxy

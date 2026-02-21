@@ -67,6 +67,8 @@ create_layout() {
 
   # Avvio strumenti
   tmux send-keys -t "$left_top_id"      'clear; $HOME/.bigide/scripts/filetree.sh' C-m
+  # Resize-trick: forza nvim a ridisegnare dopo startup (1col ±1 → evento resize → redraw completo)
+  { sleep 5 && tmux resize-pane -t "${left_top_id}" -x 41 2>/dev/null && sleep 0.2 && tmux resize-pane -t "${left_top_id}" -x 40 2>/dev/null; } &
   tmux send-keys -t "$right_top_id"     'clear; $HOME/.bigide/scripts/launch-claude.sh' C-m
   tmux send-keys -t "$terminal_pane_id" 'clear; zsh' C-m
   tmux send-keys -t "$logs_pane_id"     'clear; zsh' C-m
