@@ -28,6 +28,14 @@ init_runtime() {
   mkdir -p "$nvim_config_dir"
   cp -r "$BIGIDE_REPO_ROOT/config/nvim/." "$nvim_config_dir/"
 
+  # Plugin LazyVim — installazione headless (solo se mancante, DOPO copia config)
+  local lazy_dir="${XDG_DATA_HOME:-$HOME/.local/share}/bigide/lazy/lazy.nvim"
+  if [[ ! -d "$lazy_dir" ]]; then
+    log "INFO" "Installazione plugin LazyVim (prima volta, attendere)..."
+    NVIM_APPNAME=bigide nvim --headless "+Lazy! sync" +qa 2>/dev/null \
+      || log "WARN" "LazyVim sync non completato, verrà riprovato al prossimo avvio"
+  fi
+
   # Scripts (sovrascrivi e chmod)
   cp -r "$BIGIDE_REPO_ROOT/src/shell/scripts/" "$BIGIDE_HOME/scripts/"
   # Anche quelli in config/scripts che hanno __BIGIDE_REPO_ROOT__ placeholder

@@ -75,14 +75,6 @@ _ensure_mcp_build() {
     || log "WARN" "Build MCP non riuscita"
 }
 
-_ensure_lazyvim_plugins() {
-  local lazy_dir="${XDG_DATA_HOME:-$HOME/.local/share}/bigide/lazy/lazy.nvim"
-  [[ -d "$lazy_dir" ]] && return
-  log "INFO" "Installazione plugin LazyVim (solo prima volta)..."
-  NVIM_APPNAME=bigide nvim --headless "+Lazy! sync" +qa 2>/dev/null \
-    || log "WARN" "Installazione plugin LazyVim non completata, verrà riprovata al prossimo avvio"
-}
-
 # ── Entry point principale ────────────────────────────────────────────────────
 
 ensure_dependencies() {
@@ -94,7 +86,7 @@ ensure_dependencies() {
   _ensure_bun
   _ensure_uv
   _ensure_mcp_build
-  _ensure_lazyvim_plugins
+  # LazyVim plugins installati da init_runtime() dopo copia config
 }
 
 # Verifica rapida (solo check, no install) — usata per messaggi diagnostici
