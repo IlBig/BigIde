@@ -1,39 +1,55 @@
 -- neo-tree: file explorer VSCode-like per BigIDE
+-- FILE TREE ONLY: nessuna apertura/modifica file, nessuna chiusura nvim
 return {
   "nvim-neo-tree/neo-tree.nvim",
   opts = {
-    -- Occupa l'intera finestra nvim (nessun buffer editor a fianco)
     window = {
       position = "current",
       mappings = {
-        -- ► espandi / ◄ collassa singolo ramo
-        ["l"]     = "open",
-        ["h"]     = "close_node",
-        ["<CR>"]  = "open",
-        ["<BS>"]  = "navigate_up",
-        ["."]     = "set_root",
-        ["H"]     = "toggle_hidden",
-        ["R"]     = "refresh",
-        ["a"]     = "add",
-        ["d"]     = "delete",
-        ["r"]     = "rename",
-        ["y"]     = "copy_to_clipboard",
-        ["x"]     = "cut_to_clipboard",
-        ["p"]     = "paste_from_clipboard",
-        ["q"]     = "close_window",
-        ["?"]     = "show_help",
+        -- ► espandi cartella / ◄ collassa — NON apre file
+        ["l"] = function(state)
+          local node = state.tree:get_node()
+          if node.type == "directory" then
+            require("neo-tree.sources.filesystem.commands").open(state)
+          end
+        end,
+        ["<CR>"] = function(state)
+          local node = state.tree:get_node()
+          if node.type == "directory" then
+            require("neo-tree.sources.filesystem.commands").open(state)
+          end
+        end,
+        ["h"]            = "close_node",
+        ["<BS>"]         = "navigate_up",
+        ["."]            = "set_root",
+        ["H"]            = "toggle_hidden",
+        ["R"]            = "refresh",
+        ["a"]            = "add",
+        ["d"]            = "delete",
+        ["r"]            = "rename",
+        ["y"]            = "copy_to_clipboard",
+        ["x"]            = "cut_to_clipboard",
+        ["p"]            = "paste_from_clipboard",
+        ["?"]            = "show_help",
+        -- Disabilita esplicitamente apertura file e chiusura finestra
+        ["q"]            = false,
+        ["o"]            = false,
+        ["<2-LeftMouse>"]= false,
+        ["s"]            = false,  -- open_split
+        ["S"]            = false,  -- open_vsplit
+        ["t"]            = false,  -- open_tabnew
+        ["w"]            = false,  -- open_with_window_picker
       },
     },
     filesystem = {
       follow_current_file    = { enabled = false },
       use_libuv_file_watcher = true,
       filtered_items = {
-        visible        = false,
-        hide_dotfiles  = false,
+        visible         = false,
+        hide_dotfiles   = false,
         hide_gitignored = true,
       },
     },
-    -- Icone Nerd Font (stile VSCode Material Icons)
     default_component_configs = {
       icon = {
         folder_closed = "",
