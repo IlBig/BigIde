@@ -41,7 +41,7 @@ apply_layout_resize() {
 create_layout() {
   local session_name="$1"
   local layout_name="${2:-default}"
-  local full_pane gitbar_pane left_top_id right_top_id terminal_pane_id
+  local full_pane gitbar_pane left_top_id right_top_id terminal_pane_id logs_pane_id
 
   load_layout_vars "$layout_name"
 
@@ -75,8 +75,9 @@ create_layout() {
   tmux send-keys -t "$gitbar_pane" "while true; do bash \$HOME/.bigide/scripts/git-bar.sh '${project_path}' 2>/dev/null; sleep 2; done" C-m
 
   # Hook: usa pane ID (%N) stabili — gli indici (0.N) cambiano se si aggiungono pane manualmente
+  # terminal/logs: ciascuno = (window_width - 40 filetree - 2 bordi) / 2
   tmux set-hook -t "$session_name" client-resized \
-    "run-shell 'tmux resize-pane -t ${left_top_id} -x 40 2>/dev/null; tmux resize-pane -t ${gitbar_pane} -y 1 2>/dev/null; true'"
+    "run-shell 'tw=\$(tmux display-message -p \"#{window_width}\"); half=\$(( (tw - 42) / 2 )); tmux resize-pane -t ${left_top_id} -x 40 2>/dev/null; tmux resize-pane -t ${gitbar_pane} -y 1 2>/dev/null; tmux resize-pane -t ${terminal_pane_id} -x \$half 2>/dev/null; true'"
 
   # Seleziona claude come pane attivo
   tmux select-pane -t "$right_top_id"
