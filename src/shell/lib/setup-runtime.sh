@@ -44,4 +44,56 @@ init_runtime() {
     sed "s#__BIGIDE_REPO_ROOT__#$BIGIDE_REPO_ROOT#g" "$script" > "$BIGIDE_HOME/scripts/$(basename "$script")"
   done
   chmod +x "$BIGIDE_HOME/scripts"/*.sh
+
+  # Configurazione Ghostty dedicata BigIDE
+  mkdir -p "$BIGIDE_HOME/ghostty"
+  cp "$BIGIDE_REPO_ROOT/config/ghostty/config" "$BIGIDE_HOME/ghostty/config"
+
+  # BigIDE.app — bundle macOS per doppio clic
+  _create_app_bundle
+}
+
+_create_app_bundle() {
+  local app_dir="$HOME/Applications/BigIDE.app"
+  local macos_dir="$app_dir/Contents/MacOS"
+  local ghostty_bin="/Applications/Ghostty.app/Contents/MacOS/ghostty"
+
+  mkdir -p "$macos_dir"
+
+  # Info.plist
+  cat > "$app_dir/Contents/Info.plist" << 'PLIST'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
+  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleExecutable</key>   <string>BigIDE</string>
+  <key>CFBundleIdentifier</key>  <string>com.bigide.app</string>
+  <key>CFBundleName</key>        <string>BigIDE</string>
+  <key>CFBundleDisplayName</key> <string>BigIDE</string>
+  <key>CFBundleVersion</key>     <string>1.0</string>
+  <key>CFBundlePackageType</key> <string>APPL</string>
+  <key>LSMinimumSystemVersion</key> <string>12.0</string>
+</dict>
+</plist>
+PLIST
+
+  # Launcher: apre Ghostty con la config BigIDE
+  cat > "$macos_dir/BigIDE" << LAUNCHER
+#!/usr/bin/env bash
+GHOSTTY="$ghostty_bin"
+CONFIG="\$HOME/.bigide/ghostty/config"
+
+# Assicura che init_runtime sia stato eseguito almeno una volta
+if [[ ! -f "\$CONFIG" ]]; then
+  osascript -e 'display alert "BigIDE non ancora configurato." message "Esegui prima: bigide --update" as warning'
+  exit 1
+fi
+
+exec "\$GHOSTTY" --config-file="\$CONFIG"
+LAUNCHER
+
+  chmod +x "$macos_dir/BigIDE"
+
+  log "INFO" "BigIDE.app creata in ~/Applications/"
 }
