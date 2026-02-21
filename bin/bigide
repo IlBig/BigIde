@@ -51,18 +51,13 @@ case "${1:-}" in
     ;;
 esac
 
-PROJECT_PATH="${1:-$PWD}"
-# Se dopo shift 2 il path non c'è, usa PWD.
-# Se PROJECT_PATH era --layout, lo shift lo ha tolto.
-# Ma se l'utente fa `bigide . --layout web`, dobbiamo gestire entrambi.
-
-# Fix per argomenti misti
-for arg in "$@"; do
-  if [[ "$arg" == "--layout" ]]; then
-     # Già gestito o da gestire nel loop
-     :
-  fi
-done
+# Se lanciato dall'app senza argomento → mostra picker grafico
+if [[ -z "${1:-}" && "${BIGIDE_LAUNCHED_FROM_APP:-}" == "1" ]]; then
+  PROJECT_PATH="$(osascript -e 'POSIX path of (choose folder with prompt "Seleziona la cartella del progetto:")'  2>/dev/null)" || exit 0
+  PROJECT_PATH="${PROJECT_PATH%/}"  # rimuove trailing slash
+else
+  PROJECT_PATH="${1:-$PWD}"
+fi
 
 SESSION_NAME="$(session_name_for_path "$PROJECT_PATH")"
 
