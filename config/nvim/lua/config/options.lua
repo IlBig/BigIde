@@ -17,6 +17,8 @@ vim.api.nvim_create_autocmd("VimEnter", {
       local ok, cmd = pcall(require, "neo-tree.command")
       if ok then
         cmd.execute({ action = "show", position = "current", dir = vim.fn.getcwd() })
+        -- Redraw dopo neo-tree: garantisce paint corretto in tmux al primo avvio
+        vim.schedule(function() vim.cmd("redraw!") end)
       end
     end)
   end,
