@@ -9,11 +9,14 @@ vim.opt.laststatus   = 0
 vim.opt.showtabline  = 0
 vim.opt.cmdheight    = 0
 
--- Auto-apri neo-tree all'avvio se nessun file passato
+-- Auto-apri neo-tree all'avvio (pcall: non crasha se plugin mancante)
 vim.api.nvim_create_autocmd("VimEnter", {
   callback = function()
     vim.schedule(function()
-      require("neo-tree.command").execute({ action = "show", position = "current" })
+      local ok, cmd = pcall(require, "neo-tree.command")
+      if ok then
+        cmd.execute({ action = "show", position = "current" })
+      end
     end)
   end,
 })
