@@ -16,6 +16,20 @@ load_layout_vars() {
   [[ "$lower_height" =~ ^[0-9]+$ ]]  || die "Valore lower height non valido"
 }
 
+apply_layout_resize() {
+  local session_name="$1"
+  local layout_name="${2:-default}"
+  load_layout_vars "$layout_name"
+
+  local total_cols
+  total_cols=$(tmux display-message -p -t "${session_name}:0" "#{window_width}" 2>/dev/null) || return 0
+  local tree_cols=$(( total_cols * yazi_width / 100 ))
+  [[ "$tree_cols" -lt 5 ]] && tree_cols=5
+
+  # Pane 0 = file tree (pane più a sinistra nella finestra 0)
+  tmux resize-pane -t "${session_name}:0.0" -x "$tree_cols" 2>/dev/null || true
+}
+
 create_layout() {
   local session_name="$1"
   local layout_name="${2:-default}"

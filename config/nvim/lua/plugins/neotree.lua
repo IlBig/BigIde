@@ -20,8 +20,8 @@ return {
           end
         end,
         ["h"]            = "close_node",
-        ["<BS>"]         = "navigate_up",
-        ["."]            = "set_root",
+        ["<BS>"]         = false,  -- disabilitato: non uscire dalla root progetto
+        ["."]            = false,  -- disabilitato: non cambiare root
         ["H"]            = "toggle_hidden",
         ["R"]            = "refresh",
         ["a"]            = "add",

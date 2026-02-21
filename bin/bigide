@@ -93,6 +93,8 @@ if session_exists "$SESSION_NAME"; then
       ;;
     *)
       show_splash "Aggancio sessione" 80
+      # Applica sempre le dimensioni aggiornate del layout, anche alla ripresa
+      apply_layout_resize "$SESSION_NAME" "$LAYOUT_NAME"
       end_splash
       if [ -n "${TMUX:-}" ]; then
         exec tmux switch-client -t "$SESSION_NAME"
