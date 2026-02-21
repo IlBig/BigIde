@@ -1,0 +1,2 @@
+-- Keymaps BigIDE (LazyVim aggiunge già le sue defaults)
+-- Nessuna aggiunta per ora — il tree si naviga con ↑↓ Enter ←→

@@ -19,9 +19,14 @@ init_runtime() {
   cp "$BIGIDE_REPO_ROOT/config/yazi/yazi.toml"  "$BIGIDE_HOME/yazi/yazi.toml"
   cp "$BIGIDE_REPO_ROOT/config/yazi/theme.toml" "$BIGIDE_HOME/yazi/theme.toml"
 
-  # Broot config (file tree VSCode-style)
+  # Broot config (fallback se nvim non disponibile)
   mkdir -p "$BIGIDE_HOME/broot"
   cp "$BIGIDE_REPO_ROOT/config/broot/conf.toml" "$BIGIDE_HOME/broot/conf.toml"
+
+  # Neovim/LazyVim config — NVIM_APPNAME=bigide legge da ~/.config/bigide/
+  local nvim_config_dir="${XDG_CONFIG_HOME:-$HOME/.config}/bigide"
+  mkdir -p "$nvim_config_dir"
+  cp -r "$BIGIDE_REPO_ROOT/config/nvim/." "$nvim_config_dir/"
 
   # Scripts (sovrascrivi e chmod)
   cp -r "$BIGIDE_REPO_ROOT/src/shell/scripts/" "$BIGIDE_HOME/scripts/"
