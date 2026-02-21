@@ -2,7 +2,17 @@
 -- FILE TREE ONLY: nessuna apertura/modifica file, nessuna chiusura nvim
 return {
   "nvim-neo-tree/neo-tree.nvim",
+  dependencies = {
+    "nvim-lua/plenary.nvim",
+    "nvim-tree/nvim-web-devicons",  -- icone per tipo file
+    "MunifTanjim/nui.nvim",
+  },
   opts = {
+    -- Usa nvim-web-devicons per icone per tipo di file
+    use_default_mappings = false,
+    enable_git_status    = true,
+    enable_diagnostics   = false,
+
     window = {
       position = "current",
       mappings = {
@@ -19,29 +29,33 @@ return {
             require("neo-tree.sources.filesystem.commands").open(state)
           end
         end,
-        ["h"]            = "close_node",
-        ["<BS>"]         = false,  -- disabilitato: non uscire dalla root progetto
-        ["."]            = false,  -- disabilitato: non cambiare root
-        ["H"]            = "toggle_hidden",
-        ["R"]            = "refresh",
-        ["a"]            = "add",
-        ["d"]            = "delete",
-        ["r"]            = "rename",
-        ["y"]            = "copy_to_clipboard",
-        ["x"]            = "cut_to_clipboard",
-        ["p"]            = "paste_from_clipboard",
-        ["?"]            = "show_help",
-        -- Disabilita esplicitamente apertura file e chiusura finestra
-        ["q"]            = false,
-        ["o"]            = false,
-        ["<2-LeftMouse>"]= false,
-        ["s"]            = false,  -- open_split
-        ["S"]            = false,  -- open_vsplit
-        ["t"]            = false,  -- open_tabnew
-        ["w"]            = false,  -- open_with_window_picker
+        ["h"]             = "close_node",
+        ["<BS>"]          = false,   -- bloccato: non uscire dalla root progetto
+        ["."]             = false,   -- bloccato: non cambiare root
+        ["H"]             = "toggle_hidden",
+        ["R"]             = "refresh",
+        ["a"]             = "add",
+        ["d"]             = "delete",
+        ["r"]             = "rename",
+        ["y"]             = "copy_to_clipboard",
+        ["x"]             = "cut_to_clipboard",
+        ["p"]             = "paste_from_clipboard",
+        ["?"]             = "show_help",
+        -- Apertura file / chiusura finestra: tutti disabilitati
+        ["q"]             = false,
+        ["o"]             = false,
+        ["e"]             = false,
+        ["s"]             = false,
+        ["S"]             = false,
+        ["t"]             = false,
+        ["w"]             = false,
+        ["<2-LeftMouse>"] = false,
       },
     },
+
     filesystem = {
+      bind_to_cwd            = true,   -- root = cwd al lancio (= cartella progetto)
+      cwd_target             = { sidebar = "tab", current = "window" },
       follow_current_file    = { enabled = false },
       use_libuv_file_watcher = true,
       filtered_items = {
@@ -50,13 +64,18 @@ return {
         hide_gitignored = true,
       },
     },
+
     default_component_configs = {
+      -- Icone cartelle (Nerd Fonts v3)
       icon = {
-        folder_closed = "",
-        folder_open   = "",
-        folder_empty  = "",
-        default       = "",
+        folder_closed   = "󰉋",
+        folder_open     = "󰝰",
+        folder_empty    = "󰉖",
+        folder_empty_open = "󰷏",
+        default         = "󰈔",
+        highlight       = "NeoTreeFileIcon",
       },
+      -- Indicatori git affianco ai file
       git_status = {
         symbols = {
           added     = "",

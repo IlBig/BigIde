@@ -15,7 +15,8 @@ vim.api.nvim_create_autocmd("VimEnter", {
     vim.schedule(function()
       local ok, cmd = pcall(require, "neo-tree.command")
       if ok then
-        cmd.execute({ action = "show", position = "current" })
+        -- dir = cwd (cartella progetto impostata da filetree.sh)
+        cmd.execute({ action = "show", position = "current", dir = vim.fn.getcwd() })
       end
     end)
   end,
