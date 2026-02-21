@@ -14,4 +14,5 @@ if [[ ! -d "$LAZY_DIR/neo-tree.nvim" ]]; then
 fi
 
 # Lancia nvim (neo-tree si apre via autocmd VimEnter)
-exec NVIM_APPNAME=bigide nvim
+export NVIM_APPNAME=bigide
+exec nvim
