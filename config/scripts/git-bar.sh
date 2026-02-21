@@ -1,15 +1,25 @@
 #!/usr/bin/env bash
-# BigIDE — barra git (1 riga fissa in fondo)
-# Output: \r\033[K per sovrascrivere sempre la stessa riga
+# BigIDE — barra git in fondo (1 riga fissa) — tema Tokyo Night
 
 PROJECT_DIR="${1:-$PWD}"
 
-printf '\033[?25l'   # nasconde cursore (no tput, funziona in 1 riga)
+# Tokyo Night RGB
+TN_CYAN='\033[38;2;125;207;255m'    # #7dcfff — branch
+TN_BLUE='\033[38;2;122;162;247m'    # #7aa2f7 — modificati
+TN_GREEN='\033[38;2;158;206;106m'   # #9ece6a — staged / pulito
+TN_YELLOW='\033[38;2;224;175;104m'  # #e0af68 — da pushare
+TN_RED='\033[38;2;247;118;142m'     # #f7768e — da pullare
+TN_PURPLE='\033[38;2;187;154;247m'  # #bb9af7 — untracked
+TN_COMMENT='\033[38;2;86;95;137m'   # #565f89 — testo secondario
+TN_BG='\033[48;2;26;27;38m'         # #1a1b26 — sfondo Tokyo Night
+RESET='\033[0m'
+
+printf '\033[?25l'         # nasconde cursore
 stty -echo 2>/dev/null || true
 
 build_git() {
   if ! git -C "$PROJECT_DIR" rev-parse --is-inside-work-tree &>/dev/null 2>&1; then
-    printf '\033[90m nessun repo git\033[0m'
+    printf "${TN_BG}${TN_COMMENT} nessun repo git${RESET}"
     return
   fi
 
@@ -28,21 +38,23 @@ build_git() {
   untracked=$(git -C "$PROJECT_DIR" ls-files --others --exclude-standard 2>/dev/null | wc -l | tr -d ' ')
   stash=$(git     -C "$PROJECT_DIR" stash list 2>/dev/null | wc -l | tr -d ' ')
 
-  local out=" \033[36;1m⎇ ${branch}\033[0m"
-  [[ "$ahead"     -gt 0 ]] && out+="   \033[33;1m↑${ahead} da pushare\033[0m"
-  [[ "$behind"    -gt 0 ]] && out+="   \033[31;1m↓${behind}\033[0m"
-  [[ "$staged"    -gt 0 ]] && out+="   \033[32;1m● ${staged} staged\033[0m"
-  [[ "$modified"  -gt 0 ]] && out+="   \033[34;1m✚ ${modified} modificati\033[0m"
-  [[ "$untracked" -gt 0 ]] && out+="   \033[35;1m? ${untracked} nuovi\033[0m"
-  [[ "$stash"     -gt 0 ]] && out+="   \033[36m⚑ ${stash} stash\033[0m"
+  local out="${TN_BG}"
+  out+=" ${TN_CYAN}⎇ ${branch}${RESET}${TN_BG}"
+  [[ "$ahead"     -gt 0 ]] && out+="${TN_COMMENT}   ${TN_YELLOW}↑${ahead} da pushare${RESET}${TN_BG}"
+  [[ "$behind"    -gt 0 ]] && out+="${TN_COMMENT}   ${TN_RED}↓${behind} da pullare${RESET}${TN_BG}"
+  [[ "$staged"    -gt 0 ]] && out+="${TN_COMMENT}   ${TN_GREEN}● ${staged} staged${RESET}${TN_BG}"
+  [[ "$modified"  -gt 0 ]] && out+="${TN_COMMENT}   ${TN_BLUE}✚ ${modified} modificati${RESET}${TN_BG}"
+  [[ "$untracked" -gt 0 ]] && out+="${TN_COMMENT}   ${TN_PURPLE}? ${untracked} nuovi${RESET}${TN_BG}"
+  [[ "$stash"     -gt 0 ]] && out+="${TN_COMMENT}   ${TN_CYAN}⚑ ${stash} stash${RESET}${TN_BG}"
   [[ "$staged" -eq 0 && "$modified" -eq 0 && "$untracked" -eq 0 && \
-     "$ahead"  -eq 0 && "$behind"  -eq 0 ]] && out+="   \033[32m✔ pulito\033[0m"
+     "$ahead"  -eq 0 && "$behind"  -eq 0 ]] && \
+    out+="${TN_COMMENT}   ${TN_GREEN}✔ pulito${RESET}${TN_BG}"
+  out+="${RESET}"
 
   printf '%b' "$out"
 }
 
 while true; do
-  # \r = inizio riga, \033[K = cancella fino a fine riga, poi stampa
   printf '\r\033[K'
   build_git
   sleep 5
