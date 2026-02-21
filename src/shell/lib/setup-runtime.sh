@@ -38,9 +38,10 @@ init_runtime() {
 
   # Scripts (sovrascrivi e chmod)
   cp -r "$BIGIDE_REPO_ROOT/src/shell/scripts/" "$BIGIDE_HOME/scripts/"
-  # Anche quelli in config/scripts che hanno __BIGIDE_REPO_ROOT__ placeholder
-  if [[ -f "$BIGIDE_REPO_ROOT/config/scripts/launch-claude.sh" ]]; then
-    sed "s#__BIGIDE_REPO_ROOT__#$BIGIDE_REPO_ROOT#g" "$BIGIDE_REPO_ROOT/config/scripts/launch-claude.sh" > "$BIGIDE_HOME/scripts/launch-claude.sh"
-  fi
+  # config/scripts/ ha precedenza su src/shell/scripts/ — copia tutti con sostituzione placeholder
+  for script in "$BIGIDE_REPO_ROOT/config/scripts/"*.sh; do
+    [[ -f "$script" ]] || continue
+    sed "s#__BIGIDE_REPO_ROOT__#$BIGIDE_REPO_ROOT#g" "$script" > "$BIGIDE_HOME/scripts/$(basename "$script")"
+  done
   chmod +x "$BIGIDE_HOME/scripts"/*.sh
 }
