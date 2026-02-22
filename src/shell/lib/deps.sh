@@ -91,6 +91,15 @@ _ensure_mcp_build() {
     || log "WARN" "Build MCP non riuscita"
 }
 
+_ensure_pip_deps() {
+  # tls-client: bypass Cloudflare per wrapper Perplexity (impersona TLS Chrome)
+  if ! python3 -c "import tls_client" 2>/dev/null; then
+    log "INFO" "Installazione tls-client..."
+    pip3 install -q tls-client typing_extensions 2>/dev/null \
+      || log "WARN" "Impossibile installare tls-client"
+  fi
+}
+
 # ── Entry point principale ────────────────────────────────────────────────────
 
 ensure_dependencies() {
@@ -102,6 +111,7 @@ ensure_dependencies() {
   _ensure_bun
   _ensure_uv
   _ensure_mcp_build
+  _ensure_pip_deps
   # LazyVim plugins installati da init_runtime() dopo copia config
 }
 
