@@ -20,9 +20,10 @@ fi
 if [[ -n "$PERP_PANE" ]]; then
   tmux kill-pane -t "$PERP_PANE"
   rm -f "$PANE_ID_FILE"
-  # Ripristina bordo pane standard
+  # Rimuovi hook e ripristina bordo standard
+  SESSION=$(tmux display-message -p '#{session_name}')
+  tmux set-hook -u -t "$SESSION" after-select-pane 2>/dev/null || true
   tmux set-option -w pane-active-border-style "fg=#3b4261,bg=#1e2030"
-  tmux set-option -w pane-border-style        "fg=#3b4261,bg=#1e2030"
 else
   SESSION=$(tmux display-message -p '#{session_name}')
 
@@ -38,13 +39,15 @@ else
 
   NEW_PANE=$(tmux split-window -h -p 50 -t "$CLAUDE_PANE" -P -F '#{pane_id}')
 
-  # Bordo bianco per il pane Perplexity
-  tmux set-option -w pane-active-border-style "fg=white,bg=#1e2030"
-  tmux set-option -w pane-border-style        "fg=white,bg=#1e2030"
-
   # Salva ID per il prossimo toggle
   mkdir -p "$(dirname "$PANE_ID_FILE")"
   echo "$NEW_PANE" > "$PANE_ID_FILE"
+
+  # Hook: bordo bianco solo quando il pane Perplexity è attivo
+  tmux set-hook -t "$SESSION" after-select-pane \
+    "run-shell 'bash $HOME/.bigide/scripts/perplexity-border-hook.sh'"
+  # Applica subito (il nuovo pane è già attivo)
+  tmux set-option -w pane-active-border-style "fg=white,bg=#1e2030"
 
   tmux send-keys -t "$NEW_PANE" \
     "BIGIDE_PANE_TYPE=perplexity bash \$HOME/.bigide/scripts/perplexity-wrapper.sh" C-m
