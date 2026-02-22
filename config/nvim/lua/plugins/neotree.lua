@@ -108,7 +108,8 @@ return {
         ["S"]             = false,
         ["t"]             = false,
         ["w"]             = false,
-        ["<2-LeftMouse>"] = false,
+        ["<LeftMouse>"]   = "focus",
+        ["<2-LeftMouse>"] = handle_node,
       },
     },
 
