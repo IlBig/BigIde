@@ -55,8 +55,13 @@ init_runtime() {
     cat > "$BIGIDE_HOME/perplexity/tokens.env" << 'TOKENS'
 # Perplexity Web Session Tokens — NON committare questo file
 # Ottieni i valori da: perplexity.ai → F12 → Application → Cookies
+#
+# PERPLEXITY_SESSION_TOKEN: cookie __Secure-next-auth.session-token (lunga durata)
+# CF_CLEARANCE:             cookie cf_clearance (rinnovare se scade, ~1h)
+# CF_BM:                    cookie __cf_bm (molto corto, opzionale)
 PERPLEXITY_SESSION_TOKEN=""
-PERPLEXITY_CSRF_TOKEN=""
+CF_CLEARANCE=""
+CF_BM=""
 TOKENS
     chmod 600 "$BIGIDE_HOME/perplexity/tokens.env"
   fi
@@ -82,7 +87,6 @@ _setup_perplexity_mcp() {
     log "INFO" "Registrazione MCP Perplexity..."
     claude mcp add perplexity-web \
       --env PERPLEXITY_SESSION_TOKEN="$PERPLEXITY_SESSION_TOKEN" \
-      --env PERPLEXITY_CSRF_TOKEN="$PERPLEXITY_CSRF_TOKEN" \
       -- npx -y @mishamyrt/perplexity-web-api-mcp 2>/dev/null \
       || log "WARN" "Registrazione MCP Perplexity non riuscita"
   fi
