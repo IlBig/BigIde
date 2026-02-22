@@ -20,6 +20,9 @@ fi
 if [[ -n "$PERP_PANE" ]]; then
   tmux kill-pane -t "$PERP_PANE"
   rm -f "$PANE_ID_FILE"
+  # Ripristina bordo pane standard
+  tmux set-option -w pane-active-border-style "fg=#3b4261,bg=#1e2030"
+  tmux set-option -w pane-border-style        "fg=#3b4261,bg=#1e2030"
 else
   SESSION=$(tmux display-message -p '#{session_name}')
 
@@ -34,6 +37,10 @@ else
     CLAUDE_PANE=$(tmux display-message -p '#{pane_id}')
 
   NEW_PANE=$(tmux split-window -h -p 50 -t "$CLAUDE_PANE" -P -F '#{pane_id}')
+
+  # Bordo bianco per il pane Perplexity
+  tmux set-option -w pane-active-border-style "fg=white,bg=#1e2030"
+  tmux set-option -w pane-border-style        "fg=white,bg=#1e2030"
 
   # Salva ID per il prossimo toggle
   mkdir -p "$(dirname "$PANE_ID_FILE")"
