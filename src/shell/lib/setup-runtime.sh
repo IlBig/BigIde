@@ -45,6 +45,10 @@ init_runtime() {
   done
   chmod +x "$BIGIDE_HOME/scripts"/*.sh
 
+  # Moduli Python (config/scripts/perplexity/)
+  cp -r "$BIGIDE_REPO_ROOT/config/scripts/perplexity/" "$BIGIDE_HOME/scripts/perplexity/"
+  chmod +x "$BIGIDE_HOME/scripts/perplexity/"*.py 2>/dev/null || true
+
   # Configurazione Ghostty dedicata BigIDE
   mkdir -p "$BIGIDE_HOME/ghostty"
   cp "$BIGIDE_REPO_ROOT/config/ghostty/config" "$BIGIDE_HOME/ghostty/config"
