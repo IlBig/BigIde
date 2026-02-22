@@ -49,8 +49,43 @@ init_runtime() {
   mkdir -p "$BIGIDE_HOME/ghostty"
   cp "$BIGIDE_REPO_ROOT/config/ghostty/config" "$BIGIDE_HOME/ghostty/config"
 
+  # Perplexity — cartella token (non sovrascrivere se esiste già con credenziali)
+  mkdir -p "$BIGIDE_HOME/perplexity"
+  if [[ ! -f "$BIGIDE_HOME/perplexity/tokens.env" ]]; then
+    cat > "$BIGIDE_HOME/perplexity/tokens.env" << 'TOKENS'
+# Perplexity Web Session Tokens — NON committare questo file
+# Ottieni i valori da: perplexity.ai → F12 → Application → Cookies
+PERPLEXITY_SESSION_TOKEN=""
+PERPLEXITY_CSRF_TOKEN=""
+TOKENS
+    chmod 600 "$BIGIDE_HOME/perplexity/tokens.env"
+  fi
+
+  # MCP Perplexity — registra server se token configurati
+  _setup_perplexity_mcp
+
   # BigIDE.app — bundle macOS per doppio clic
   _create_app_bundle
+}
+
+_setup_perplexity_mcp() {
+  local tokens_file="$BIGIDE_HOME/perplexity/tokens.env"
+  [[ -f "$tokens_file" ]] || return 0
+
+  source "$tokens_file" 2>/dev/null || return 0
+  [[ -z "$PERPLEXITY_SESSION_TOKEN" ]] && return 0
+
+  if ! command -v claude >/dev/null 2>&1; then return 0; fi
+
+  # Registra MCP server se non già presente
+  if ! claude mcp list 2>/dev/null | grep -q "perplexity"; then
+    log "INFO" "Registrazione MCP Perplexity..."
+    claude mcp add perplexity-web \
+      --env PERPLEXITY_SESSION_TOKEN="$PERPLEXITY_SESSION_TOKEN" \
+      --env PERPLEXITY_CSRF_TOKEN="$PERPLEXITY_CSRF_TOKEN" \
+      -- npx -y @mishamyrt/perplexity-web-api-mcp 2>/dev/null \
+      || log "WARN" "Registrazione MCP Perplexity non riuscita"
+  fi
 }
 
 _create_app_bundle() {
