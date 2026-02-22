@@ -65,12 +65,12 @@ create_layout() {
 
   sleep 1
 
-  # Marca i pane con il loro ruolo (usato da toggle script come perplexity-toggle.sh)
-  tmux set-option -t "$left_top_id"      @bigide_pane_type "yazi"
-  tmux set-option -t "$right_top_id"     @bigide_pane_type "claude"
-  tmux set-option -t "$terminal_pane_id" @bigide_pane_type "terminal"
-  tmux set-option -t "$logs_pane_id"     @bigide_pane_type "logs"
-  tmux set-option -t "$gitbar_pane"      @bigide_pane_type "gitbar"
+  # Marca i pane con il loro ruolo a livello pane (-p), non window
+  tmux set-option -p -t "$left_top_id"      @bigide_pane_type "yazi"
+  tmux set-option -p -t "$right_top_id"     @bigide_pane_type "claude"
+  tmux set-option -p -t "$terminal_pane_id" @bigide_pane_type "terminal"
+  tmux set-option -p -t "$logs_pane_id"     @bigide_pane_type "logs"
+  tmux set-option -p -t "$gitbar_pane"      @bigide_pane_type "gitbar"
 
   # Avvio strumenti
   tmux send-keys -t "$left_top_id"      'clear; $HOME/.bigide/scripts/filetree.sh' C-m
