@@ -65,6 +65,65 @@ _stop_spinner() {
 
 trap '_stop_spinner' EXIT INT TERM
 
+# ── SELEZIONE MODALITÀ ────────────────────────────────────────────
+
+_draw_mode_selector() {
+  local selected="$1"   # 0 = Ricerca, 1 = Approfondita
+  local cols; cols=$(_cols)
+
+  # Cancella le 4 righe del selettore e ridisegna
+  printf '\033[4A\033[J'
+
+  if [[ $selected -eq 0 ]]; then
+    echo -e " ${TN_BLUE}${TN_BOLD}▶  ○  Ricerca${TN_RESET}           ${TN_COMMENT}ricerca web standard${TN_RESET}"
+    echo -e " ${TN_COMMENT}   ⊕  Approfondita       analisi dettagliata (Pro)${TN_RESET}"
+  else
+    echo -e " ${TN_COMMENT}   ○  Ricerca             ricerca web standard${TN_RESET}"
+    echo -e " ${TN_BLUE}${TN_BOLD}▶  ⊕  Approfondita${TN_RESET}       ${TN_COMMENT}analisi dettagliata (Pro)${TN_RESET}"
+  fi
+  echo ""
+  echo -e " ${TN_DARK}↑ ↓  seleziona  ·  ↵  conferma${TN_RESET}"
+}
+
+_select_mode() {
+  local selected=0
+
+  # Disegna prima volta (senza cancellare)
+  echo -e " ${TN_BLUE}${TN_BOLD}▶  ○  Ricerca${TN_RESET}           ${TN_COMMENT}ricerca web standard${TN_RESET}"
+  echo -e " ${TN_COMMENT}   ⊕  Approfondita       analisi dettagliata (Pro)${TN_RESET}"
+  echo ""
+  echo -e " ${TN_DARK}↑ ↓  seleziona  ·  ↵  conferma${TN_RESET}"
+
+  tput civis 2>/dev/null
+  while true; do
+    # Legge tasto (gestisce frecce come sequenze escape a 3 byte)
+    read -rsn 1 k1
+    if [[ "$k1" == $'\033' ]]; then
+      read -rsn 2 k2
+      case "$k2" in
+        '[A') # ↑
+          selected=$(( (selected + 1) % 2 ))
+          _draw_mode_selector $selected ;;
+        '[B') # ↓
+          selected=$(( (selected + 1) % 2 ))
+          _draw_mode_selector $selected ;;
+      esac
+    elif [[ "$k1" == "" ]]; then   # ↵ Enter
+      break
+    fi
+  done
+  tput cnorm 2>/dev/null
+
+  # Pulisci il selettore
+  printf '\033[4A\033[J'
+
+  if [[ $selected -eq 0 ]]; then
+    search_mode="standard"
+  else
+    search_mode="deep"
+  fi
+}
+
 # ── INIT ──────────────────────────────────────────────────────────
 
 [[ -f "$TOKENS_FILE" ]] && source "$TOKENS_FILE"
@@ -113,6 +172,11 @@ mkdir -p "$(dirname "$HISTORY_FILE")"
 last_query=""
 _modify=0
 search_mode="standard"
+
+# Selezione modalità all'avvio
+echo ""
+_select_mode
+echo ""
 
 _mode_label() {
   if [[ "$search_mode" == "deep" ]]; then
