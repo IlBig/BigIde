@@ -40,15 +40,11 @@ _query_perplexity() {
   python3 - \
     "$query" \
     "${PERPLEXITY_SESSION_TOKEN:-}" \
-    "${CF_CLEARANCE:-}" \
-    "${CF_BM:-}" \
     << 'PYEOF'
 import sys, json
 
-query        = sys.argv[1]
-session_tok  = sys.argv[2]
-cf_clearance = sys.argv[3]
-cf_bm        = sys.argv[4]
+query       = sys.argv[1]
+session_tok = sys.argv[2]
 
 try:
     import tls_client
@@ -69,13 +65,7 @@ sess.headers.update({
     "Origin":       "https://www.perplexity.ai",
     "Referer":      "https://www.perplexity.ai/",
 })
-
-cookies = {"__Secure-next-auth.session-token": session_tok}
-if cf_clearance:
-    cookies["cf_clearance"] = cf_clearance
-if cf_bm:
-    cookies["__cf_bm"] = cf_bm
-sess.cookies.update(cookies)
+sess.cookies.update({"__Secure-next-auth.session-token": session_tok})
 
 payload = {
     "query_str":    query,

@@ -54,14 +54,9 @@ init_runtime() {
   if [[ ! -f "$BIGIDE_HOME/perplexity/tokens.env" ]]; then
     cat > "$BIGIDE_HOME/perplexity/tokens.env" << 'TOKENS'
 # Perplexity Web Session Tokens — NON committare questo file
-# Ottieni i valori da: perplexity.ai → F12 → Application → Cookies
-#
-# PERPLEXITY_SESSION_TOKEN: cookie __Secure-next-auth.session-token (lunga durata)
-# CF_CLEARANCE:             cookie cf_clearance (rinnovare se scade, ~1h)
-# CF_BM:                    cookie __cf_bm (molto corto, opzionale)
+# Ottieni il valore da: perplexity.ai → F12 → Application → Cookies
+# Cookie: __Secure-next-auth.session-token  (lunga durata, non scade spesso)
 PERPLEXITY_SESSION_TOKEN=""
-CF_CLEARANCE=""
-CF_BM=""
 TOKENS
     chmod 600 "$BIGIDE_HOME/perplexity/tokens.env"
   fi
