@@ -65,6 +65,13 @@ create_layout() {
 
   sleep 1
 
+  # Marca i pane con il loro ruolo (usato da toggle script come perplexity-toggle.sh)
+  tmux set-option -t "$left_top_id"      @bigide_pane_type "yazi"
+  tmux set-option -t "$right_top_id"     @bigide_pane_type "claude"
+  tmux set-option -t "$terminal_pane_id" @bigide_pane_type "terminal"
+  tmux set-option -t "$logs_pane_id"     @bigide_pane_type "logs"
+  tmux set-option -t "$gitbar_pane"      @bigide_pane_type "gitbar"
+
   # Avvio strumenti
   tmux send-keys -t "$left_top_id"      'clear; $HOME/.bigide/scripts/filetree.sh' C-m
   # Resize-trick: forza nvim a ridisegnare dopo startup (1col ±1 → evento resize → redraw completo)

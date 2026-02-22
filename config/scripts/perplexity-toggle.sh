@@ -33,8 +33,9 @@ else
   # Pannello non esiste → split verticale 50% del pane Claude (pane 2 = right_top)
   CLAUDE_PANE=$(tmux list-panes -t "$SESSION" -F '#{pane_id} #{@bigide_pane_type}' 2>/dev/null \
     | awk '$2=="claude"{print $1}' | head -1)
-  
-  # Fallback: usa il pane attivo
+
+  # Fallback: pane indice 1 della finestra main (sempre Claude nel layout default)
+  [[ -z "$CLAUDE_PANE" ]] && CLAUDE_PANE=$(tmux display-message -p -t "${SESSION}:0.1" '#{pane_id}' 2>/dev/null)
   [[ -z "$CLAUDE_PANE" ]] && CLAUDE_PANE=$(tmux display-message -p '#{pane_id}')
 
   NEW_PANE=$(tmux split-window -h -p 50 -t "$CLAUDE_PANE" -P -F '#{pane_id}')
