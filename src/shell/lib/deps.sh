@@ -73,12 +73,14 @@ _ensure_npm_globals() {
 
 _ensure_bun() {
   _check_cmd bun && return
+  [[ -x "$HOME/.bun/bin/bun" ]] && return  # installato ma non ancora in PATH
   log "INFO" "Installazione Bun..."
   curl -fsSL https://bun.sh/install | bash || log "WARN" "Impossibile installare Bun"
 }
 
 _ensure_uv() {
   _check_cmd uv && return
+  [[ -x "$HOME/.local/bin/uv" ]] && return  # installato ma non ancora in PATH
   log "INFO" "Installazione uv..."
   curl -LsSf https://astral.sh/uv/install.sh | sh || log "WARN" "Impossibile installare uv"
 }
