@@ -87,6 +87,7 @@ _ensure_deps() {
 
 _query() {
   PERPLEXITY_SESSION_TOKEN="$PERPLEXITY_SESSION_TOKEN" \
+  PERPLEXITY_SEARCH_MODE="$search_mode" \
     python3 "$CLIENT_PY" "$1"
 }
 
@@ -111,18 +112,37 @@ mkdir -p "$(dirname "$HISTORY_FILE")"
 
 last_query=""
 _modify=0
+search_mode="standard"
+
+_mode_label() {
+  if [[ "$search_mode" == "deep" ]]; then
+    echo -e "${TN_DARK}⊕ Approfondita${TN_RESET}"
+  else
+    echo -e "${TN_COMMENT}○ Ricerca${TN_RESET}"
+  fi
+}
+
+_prompt_char() {
+  if [[ "$search_mode" == "deep" ]]; then
+    echo -e "${TN_BLUE}${TN_BOLD}❯${TN_RESET}"
+  else
+    echo -e "${TN_BLUE}❯${TN_RESET}"
+  fi
+}
 
 while true; do
+  # Modalità corrente sopra il prompt
+  echo -e " $(_mode_label)"
   # Salva posizione cursore — [m] tornerà qui
   printf '\033[s'
 
   if [[ $_modify -eq 1 && -n "$last_query" ]]; then
     _modify=0
     read -re -i "$last_query" \
-      -p "$(echo -e " ${TN_BLUE}❯${TN_RESET} ")" q 2>/dev/null \
-      || read -rp "$(echo -e " ${TN_BLUE}❯${TN_RESET} ")" q
+      -p "$(echo -e " $(_prompt_char) ")" q 2>/dev/null \
+      || read -rp "$(echo -e " $(_prompt_char) ")" q
   else
-    read -rp "$(echo -e " ${TN_BLUE}❯${TN_RESET} ")" q
+    read -rp "$(echo -e " $(_prompt_char) ")" q
   fi
 
   [[ -z "$q" ]] && continue
@@ -144,7 +164,7 @@ while true; do
   fi
 
   echo ""
-  echo -e " ${TN_COMMENT}c  copia · m  modifica · ↵  nuova domanda${TN_RESET}"
+  echo -e " ${TN_COMMENT}c  copia · m  modifica · t  modalità · ↵  nuova${TN_RESET}"
 
   while true; do
     read -rsn 1 key
@@ -162,6 +182,15 @@ while true; do
         printf '\033[J'
         _modify=1
         break ;;
+      t|T)
+        if [[ "$search_mode" == "standard" ]]; then
+          search_mode="deep"
+        else
+          search_mode="standard"
+        fi
+        printf '\033[1A\033[2K'
+        echo -e " ${TN_COMMENT}Modalità: $(_mode_label)${TN_RESET}"
+        ;;
       "")
         echo ""
         _draw_separator

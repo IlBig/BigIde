@@ -22,6 +22,10 @@ LANGUAGE = "it-IT"
 TIMEZONE = "Europe/Rome"
 FOCUS    = "internet"   # internet | writing | wolfram | youtube | reddit
 
+# Modalità ricerca — override da env PERPLEXITY_SEARCH_MODE
+# "standard" : ricerca web normale
+# "deep"     : Pro Search (COPILOT mode, più approfondita, richiede piano Pro)
+
 USER_AGENT = (
     "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
     "AppleWebKit/537.36 (KHTML, like Gecko) "
@@ -101,14 +105,19 @@ def query(text: str) -> str:
 
     sess = _make_session(token)
 
+    mode = os.environ.get("PERPLEXITY_SEARCH_MODE", "standard")
+    payload = {
+        "query_str":    text,
+        "search_focus": FOCUS,
+        "attachments":  [],
+        "language":     LANGUAGE,
+        "timezone":     TIMEZONE,
+    }
+    if mode == "deep":
+        payload["mode"] = "COPILOT"
+
     try:
-        resp = sess.post(ENDPOINT, json={
-            "query_str":    text,
-            "search_focus": FOCUS,
-            "attachments":  [],
-            "language":     LANGUAGE,
-            "timezone":     TIMEZONE,
-        })
+        resp = sess.post(ENDPOINT, json=payload)
     except Exception as e:
         print(f"ERRORE connessione: {e}", file=sys.stderr)
         sys.exit(1)
