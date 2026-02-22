@@ -44,6 +44,11 @@ local function open_preview(filepath)
   }, { detach = true })
 end
 
+local function open_with_system(filepath)
+  -- Apre il file con l'applicazione predefinita del sistema (macOS: open)
+  vim.fn.jobstart({ "open", filepath }, { detach = true })
+end
+
 local function handle_node(state)
   local node = state.tree:get_node()
   if node.type == "directory" then
@@ -52,7 +57,7 @@ local function handle_node(state)
     if is_text(node.name) then
       open_preview(node.path)
     else
-      vim.notify("File binario — anteprima non disponibile", vim.log.levels.INFO)
+      open_with_system(node.path)
     end
   end
 end
