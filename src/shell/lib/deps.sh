@@ -2,10 +2,24 @@
 set -euo pipefail
 
 # ── Dipendenze BigIDE ─────────────────────────────────────────────────────────
-
-_BREW_DEPS=(tmux jq git yazi neovim node gh ffmpeg whisper-cpp)
+# Formato: "pacchetto-brew:comando-check"  (se uguale basta il nome)
+_BREW_DEPS=(
+  "tmux:tmux"
+  "jq:jq"
+  "git:git"
+  "yazi:yazi"
+  "neovim:nvim"
+  "node:node"
+  "gh:gh"
+  "ffmpeg:ffmpeg"
+  "whisper-cpp:whisper-cli"
+)
 _BREW_CASKS=(ghostty)
 _NPM_GLOBALS=("@anthropic-ai/claude-code:claude" "perplexity-cli:perplexity")
+
+# Disabilita auto-update brew (lento e blocca l'avvio)
+export HOMEBREW_NO_AUTO_UPDATE=1
+export HOMEBREW_NO_INSTALL_UPGRADE=1
 
 _check_cmd() { command -v "$1" >/dev/null 2>&1; }
 
@@ -18,8 +32,10 @@ _ensure_brew() {
 
 _ensure_brew_deps() {
   local missing=()
-  for dep in "${_BREW_DEPS[@]}"; do
-    _check_cmd "$dep" || missing+=("$dep")
+  for entry in "${_BREW_DEPS[@]}"; do
+    local pkg="${entry%%:*}"
+    local cmd="${entry##*:}"
+    _check_cmd "$cmd" || missing+=("$pkg")
   done
   if [[ ${#missing[@]} -gt 0 ]]; then
     log "INFO" "Installazione dipendenze mancanti: ${missing[*]}"
