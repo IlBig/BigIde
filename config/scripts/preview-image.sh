@@ -1,16 +1,24 @@
 #!/usr/bin/env bash
-# BigIDE — Preview immagini ad alta qualità in tmux popup centrato
-# Usa nvim -u init-minimale + image.nvim (Kitty protocol), NO LazyVim/neo-tree
+# BigIDE — Preview immagini ad alta qualità
+# Ghostty nativo (Kitty graphics protocol) → fallback popup tmux (halfblock)
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 FILEPATH="$1"
-INIT="$HOME/.bigide/scripts/nvim-image-init.lua"
+[ ! -f "$FILEPATH" ] && exit 1
 
-tmux display-popup \
-  -E \
-  -w "90%" \
-  -h "90%" \
-  -x "C" \
-  -y "C" \
-  "nvim -n -u $(printf '%q' "$INIT") $(printf '%q' "$FILEPATH")"
+VIEWER="$HOME/.bigide/scripts/image-viewer.sh"
+
+# Ghostty nativo = qualità piena (Kitty graphics protocol)
+if command -v ghostty &>/dev/null; then
+  ghostty --fullscreen=true -e "$VIEWER" "$FILEPATH"
+else
+  # Fallback: popup tmux con blocchi Unicode (qualità minore)
+  tmux display-popup \
+    -E \
+    -w "90%" \
+    -h "90%" \
+    -x "C" \
+    -y "C" \
+    "$VIEWER $(printf '%q' "$FILEPATH")"
+fi
