@@ -13,4 +13,4 @@ tmux display-popup \
   -h "90%" \
   -x "C" \
   -y "C" \
-  "nvim -u $(printf '%q' "$INIT") $(printf '%q' "$FILEPATH")"
+  "nvim -n -u $(printf '%q' "$INIT") $(printf '%q' "$FILEPATH")"

@@ -54,16 +54,22 @@ local function open_preview(filepath)
   vim.fn.jobstart({ "bash", PREVIEW_SCRIPT, filepath }, { detach = true })
 end
 
+local function reset_display()
+  vim.schedule(function()
+    -- Reset terminale + ridisegna neovim: ripristina stato dopo popup
+    vim.fn.jobstart({ "tmux", "refresh-client" }, { detach = true })
+    vim.cmd("redraw!")
+  end)
+end
+
 local function open_preview_binary(filepath)
   if is_image(vim.fn.fnamemodify(filepath, ":t")) then
-    -- tmux popup centrato (90% schermo) con neovim+image.nvim → qualità nativa
     vim.fn.jobstart({ "bash", PREVIEW_IMAGE_SCRIPT, filepath }, {
-      on_exit = function() vim.schedule(function() vim.cmd("redraw!") end) end,
+      on_exit = function() reset_display() end,
     })
   else
-    -- Video, PDF, Office → tmux popup con chafa
     vim.fn.jobstart({ "bash", PREVIEW_BINARY_SCRIPT, filepath }, {
-      on_exit = function() vim.schedule(function() vim.cmd("redraw!") end) end,
+      on_exit = function() reset_display() end,
     })
   end
 end
