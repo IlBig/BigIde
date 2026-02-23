@@ -1,15 +1,18 @@
 -- neo-tree: file explorer VSCode-like per BigIDE
 -- Cartelle: espandi/collassa | File testo: preview modale centrata (q / Esc per chiudere)
+-- ↑/↓ naviga tra file (immagini + testo), transizioni automatiche
 
 local TEXT_EXT = {
   -- Markup / testo
-  md=1, txt=1, rst=1, adoc=1, org=1, tex=1,
+  md=1, txt=1, rst=1, adoc=1, org=1, tex=1, log=1,
   -- Dati strutturati
   json=1, jsonc=1, xml=1, yaml=1, yml=1, toml=1, ini=1, cfg=1, conf=1, csv=1, tsv=1, env=1,
+  plist=1,
   -- Shell
   sh=1, bash=1, zsh=1, fish=1, ps1=1,
   -- Scripting / backend
   lua=1, py=1, rb=1, php=1, pl=1, r=1, jl=1, ex=1, exs=1, hs=1, ml=1, el=1,
+  applescript=1, scpt=1,
   -- Web
   js=1, mjs=1, cjs=1, ts=1, jsx=1, tsx=1,
   html=1, htm=1, css=1, scss=1, sass=1, less=1, svelte=1, vue=1,
@@ -18,8 +21,26 @@ local TEXT_EXT = {
   swift=1, kt=1, m=1, mm=1, dart=1, zig=1,
   -- DevOps / infra
   sql=1, graphql=1, proto=1, tf=1, hcl=1,
+  -- Diff / patch
+  diff=1, patch=1,
   -- Vim
   vim=1, vimrc=1, lua=1,
+}
+
+local IMAGE_EXT = {
+  jpg=1, jpeg=1, png=1, gif=1, webp=1, bmp=1,
+  tiff=1, tif=1, ico=1, heic=1, heif=1, svg=1,
+  avif=1, jxl=1, qoi=1,
+}
+
+local DOC_EXT = {
+  pdf=1, docx=1, xlsx=1, pptx=1, doc=1, xls=1, ppt=1,
+  pages=1, numbers=1, key=1, odt=1, ods=1, odp=1,
+}
+
+local VIDEO_EXT = {
+  mp4=1, mov=1, avi=1, mkv=1, webm=1, m4v=1,
+  wmv=1, flv=1, mpg=1, mpeg=1, ["3gp"]=1, ts=1,
 }
 
 local KNOWN_NAMES = {
@@ -29,44 +50,264 @@ local KNOWN_NAMES = {
   [".editorconfig"]=1, Brewfile=1, Rakefile=1, Gemfile=1,
 }
 
-local function is_text(name)
-  if KNOWN_NAMES[name] then return true end
-  local ext = name:match("%.([^%.]+)$")
-  return ext ~= nil and TEXT_EXT[ext:lower()] == 1
-end
-
-local PREVIEW_SCRIPT        = vim.fn.expand("$HOME") .. "/.bigide/scripts/preview-file.sh"
-local PREVIEW_IMAGE_SCRIPT  = vim.fn.expand("$HOME") .. "/.bigide/scripts/preview-image.sh"
-local PREVIEW_BINARY_SCRIPT = vim.fn.expand("$HOME") .. "/.bigide/scripts/preview-binary.sh"
-
-local IMAGE_EXT = {
-  jpg=1, jpeg=1, png=1, gif=1, webp=1, bmp=1,
-  tiff=1, tif=1, ico=1, heic=1, heif=1, svg=1,
-  avif=1, jxl=1, qoi=1,
-}
-
 local function is_image(name)
   local ext = name:match("%.([^%.]+)$")
   return ext ~= nil and IMAGE_EXT[ext:lower()] == 1
 end
 
-local function open_preview(filepath)
-  vim.fn.jobstart({ "bash", PREVIEW_SCRIPT, filepath }, { detach = true })
+local function is_document(name)
+  local ext = name:match("%.([^%.]+)$")
+  return ext ~= nil and DOC_EXT[ext:lower()] == 1
+end
+
+local function is_video(name)
+  local ext = name:match("%.([^%.]+)$")
+  return ext ~= nil and VIDEO_EXT[ext:lower()] == 1
+end
+
+local function is_text(name, filepath)
+  if KNOWN_NAMES[name] then return true end
+  local ext = name:match("%.([^%.]+)$")
+  if ext then
+    ext = ext:lower()
+    if TEXT_EXT[ext] == 1 then return true end
+    if IMAGE_EXT[ext] == 1 then return false end
+    if DOC_EXT[ext] == 1 then return false end
+    if VIDEO_EXT[ext] == 1 then return false end
+  end
+  -- Fallback: magic number via `file --mime-type` per estensioni sconosciute / assenti
+  if filepath then
+    local ok, out = pcall(vim.fn.system, { "file", "--mime-type", "--brief", filepath })
+    if ok and vim.v.shell_error == 0 then
+      out = out:gsub("%s+$", "")
+      if out:match("^text/") then return true end
+    end
+  end
+  return false
+end
+
+local PREVIEW_SCRIPT        = vim.fn.expand("$HOME") .. "/.bigide/scripts/preview-file.sh"
+local PREVIEW_IMAGE_SCRIPT  = vim.fn.expand("$HOME") .. "/.bigide/scripts/preview-image.sh"
+local PREVIEW_DOC_SCRIPT    = vim.fn.expand("$HOME") .. "/.bigide/scripts/preview-doc.sh"
+local PREVIEW_VIDEO_SCRIPT  = vim.fn.expand("$HOME") .. "/.bigide/scripts/preview-video.sh"
+local PREVIEW_BINARY_SCRIPT = vim.fn.expand("$HOME") .. "/.bigide/scripts/preview-binary.sh"
+
+local function kill_imgview()
+  vim.fn.jobstart({ "pkill", "-x", "bigide-imgview" }, { detach = true })
+end
+
+local function kill_docview()
+  vim.fn.jobstart({ "pkill", "-x", "bigide-docview" }, { detach = true })
+end
+
+local function kill_vidview()
+  vim.fn.jobstart({ "pkill", "-x", "bigide-vidview" }, { detach = true })
+end
+
+--- Chiudi tutti i viewer overlay attivi
+local function kill_all_viewers()
+  kill_imgview()
+  kill_docview()
+  kill_vidview()
 end
 
 local function reset_display()
   vim.schedule(function()
-    -- Reset terminale + ridisegna neovim: ripristina stato dopo popup
     vim.fn.jobstart({ "tmux", "refresh-client" }, { detach = true })
     vim.cmd("redraw!")
   end)
 end
 
-local function open_preview_binary(filepath)
-  if is_image(vim.fn.fnamemodify(filepath, ":t")) then
-    vim.fn.jobstart({ "bash", PREVIEW_IMAGE_SCRIPT, filepath }, {
+--- Leggi e cancella un file temporaneo, ritorna il contenuto o nil
+local function read_and_delete(path)
+  local f = io.open(path, "r")
+  if not f then return nil end
+  local content = f:read("*a")
+  f:close()
+  os.remove(path)
+  if content then content = content:gsub("%s+$", "") end
+  if content == "" then return nil end
+  return content
+end
+
+--- Rivela un file in neo-tree (posiziona il cursore)
+local function reveal_in_neotree(filepath)
+  pcall(function()
+    require("neo-tree.command").execute({
+      source = "filesystem",
+      reveal_file = filepath,
+    })
+  end)
+end
+
+--- Imposta nav-root (preserva contesto tra transizioni immagine↔testo)
+local function set_nav_root(filepath)
+  local root_file = "/tmp/bigide-nav-root"
+  local f = io.open(root_file, "r")
+  if f then f:close(); return end  -- gia' impostato
+  f = io.open(root_file, "w")
+  if f then
+    f:write(vim.fn.getcwd())
+    f:close()
+  end
+end
+
+local function clear_nav_root()
+  os.remove("/tmp/bigide-nav-root")
+end
+
+-- Forward declarations per ricorsione mutua
+local open_preview
+local open_preview_image
+local open_preview_doc
+local open_preview_video
+
+--- Apri la preview appropriata per un file qualsiasi
+local function open_any_preview(filepath)
+  local name = vim.fn.fnamemodify(filepath, ":t")
+  if is_image(name) then
+    open_preview_image(filepath)
+  elseif is_video(name) then
+    open_preview_video(filepath)
+  elseif is_document(name) then
+    open_preview_doc(filepath)
+  elseif is_text(name, filepath) then
+    open_preview(filepath)
+  else
+    vim.fn.jobstart({ "bash", PREVIEW_BINARY_SCRIPT, filepath }, {
       on_exit = function() reset_display() end,
     })
+  end
+end
+
+--- Callback on_exit della preview testo: gestisce navigazione ↑/↓ tra file
+local function on_preview_exit()
+  reset_display()
+  vim.schedule(function()
+    local next_path = read_and_delete("/tmp/bigide-preview-next")
+    if next_path then
+      reveal_in_neotree(next_path)
+      open_any_preview(next_path)
+      return
+    end
+    -- Chiusura normale — pulisci nav-root
+    clear_nav_root()
+  end)
+end
+
+--- Callback on_exit del viewer immagini: gestisce transizione o sync cursore
+local function on_imgview_exit()
+  reset_display()
+  vim.schedule(function()
+    -- Transizione a file non-immagine (↑/↓)
+    local next_path = read_and_delete("/tmp/bigide-imgview-next")
+    if next_path then
+      reveal_in_neotree(next_path)
+      open_any_preview(next_path)
+      return
+    end
+
+    -- Chiusura normale (Esc/q/Spazio) — sync cursore neo-tree + pulisci nav-root
+    clear_nav_root()
+    local last_path = read_and_delete("/tmp/bigide-imgview-last")
+    if last_path then
+      reveal_in_neotree(last_path)
+    end
+  end)
+end
+
+--- Callback on_exit del viewer documenti: gestisce transizione o sync cursore
+local function on_docview_exit()
+  reset_display()
+  vim.schedule(function()
+    -- Transizione a file non-documento (↑/↓)
+    local next_path = read_and_delete("/tmp/bigide-docview-next")
+    if next_path then
+      reveal_in_neotree(next_path)
+      open_any_preview(next_path)
+      return
+    end
+
+    -- Chiusura normale (Esc/q/Spazio) — sync cursore neo-tree + pulisci nav-root
+    clear_nav_root()
+    local last_path = read_and_delete("/tmp/bigide-docview-last")
+    if last_path then
+      reveal_in_neotree(last_path)
+    end
+  end)
+end
+
+--- Callback on_exit del viewer video: gestisce transizione o sync cursore
+local function on_vidview_exit()
+  reset_display()
+  vim.schedule(function()
+    local next_path = read_and_delete("/tmp/bigide-vidview-next")
+    if next_path then
+      reveal_in_neotree(next_path)
+      open_any_preview(next_path)
+      return
+    end
+    clear_nav_root()
+    local last_path = read_and_delete("/tmp/bigide-vidview-last")
+    if last_path then
+      reveal_in_neotree(last_path)
+    end
+  end)
+end
+
+--- Preview video con on_exit per navigazione
+open_preview_video = function(filepath)
+  kill_all_viewers()
+  set_nav_root(filepath)
+  vim.fn.jobstart({ "bash", PREVIEW_VIDEO_SCRIPT, filepath }, {
+    on_exit = function() on_vidview_exit() end,
+  })
+end
+
+--- Preview documento con on_exit per navigazione
+open_preview_doc = function(filepath)
+  kill_all_viewers()
+  set_nav_root(filepath)
+  vim.fn.jobstart({ "bash", PREVIEW_DOC_SCRIPT, filepath }, {
+    on_exit = function() on_docview_exit() end,
+  })
+end
+
+--- Preview testo con on_exit per navigazione
+open_preview = function(filepath)
+  kill_all_viewers()
+  set_nav_root(filepath)
+  vim.fn.jobstart({ "bash", PREVIEW_SCRIPT, filepath }, {
+    on_exit = function() on_preview_exit() end,
+  })
+end
+
+--- Preview immagine con on_exit per navigazione
+open_preview_image = function(filepath)
+  kill_all_viewers()
+  set_nav_root(filepath)
+  vim.fn.jobstart({ "bash", PREVIEW_IMAGE_SCRIPT, filepath }, {
+    on_exit = function() on_imgview_exit() end,
+  })
+end
+
+--- Ricerca file (chiamata da file-search.sh via tmux send-keys)
+function BigideOpenSearch()
+  local f = io.open("/tmp/bigide-fzf-result", "r")
+  if not f then return end
+  local filepath = f:read("*a"):gsub("%s+$", "")
+  f:close()
+  os.remove("/tmp/bigide-fzf-result")
+  if filepath == "" then return end
+  reveal_in_neotree(filepath)
+  vim.defer_fn(function()
+    open_any_preview(filepath)
+  end, 100)
+end
+
+local function open_preview_binary(filepath)
+  if is_image(vim.fn.fnamemodify(filepath, ":t")) then
+    open_preview_image(filepath)
   else
     vim.fn.jobstart({ "bash", PREVIEW_BINARY_SCRIPT, filepath }, {
       on_exit = function() reset_display() end,
@@ -79,7 +320,11 @@ local function handle_node(state)
   if node.type == "directory" then
     require("neo-tree.sources.filesystem.commands").open(state)
   elseif node.type == "file" then
-    if is_text(node.name) then
+    if is_video(node.name) then
+      open_preview_video(node.path)
+    elseif is_document(node.name) then
+      open_preview_doc(node.path)
+    elseif is_text(node.name, node.path) then
       open_preview(node.path)
     else
       open_preview_binary(node.path)

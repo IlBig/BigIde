@@ -1,9 +1,13 @@
 #!/usr/bin/env bash
 # Apre un file in preview read-only dentro un tmux popup centrato su Ghostty
-# q / Esc chiudono il popup
+# ↑/↓ cambia file | Enter: leggi | q / Esc chiudono il popup
 set -euo pipefail
 
 FILEPATH="$1"
+NAV_SCRIPT="$HOME/.bigide/scripts/preview-nav.lua"
+
+# Pulisci file transizione precedenti
+rm -f /tmp/bigide-preview-next
 
 tmux display-popup \
   -E \
@@ -11,4 +15,9 @@ tmux display-popup \
   -h "82%" \
   -x "C" \
   -y "C" \
-  "BIGIDE_PREVIEW=1 NVIM_APPNAME=bigide nvim -R $(printf '%q' "$FILEPATH")"
+  "nvim -u NORC --noplugin -R \
+    -c 'set number termguicolors cursorline signcolumn=no background=dark noswapfile' \
+    -c 'syntax on' \
+    -c 'silent! colorscheme habamax' \
+    -c 'luafile $NAV_SCRIPT' \
+    $(printf '%q' "$FILEPATH")"

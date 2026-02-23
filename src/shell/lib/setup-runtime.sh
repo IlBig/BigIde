@@ -65,11 +65,80 @@ TOKENS
     chmod 600 "$BIGIDE_HOME/perplexity/tokens.env"
   fi
 
+  # Compila tool Swift (solo se sorgente più recente del binario)
+  _compile_swift_tools
+
   # MCP Perplexity — registra server se token configurati
   _setup_perplexity_mcp
 
   # BigIDE.app — bundle macOS per doppio clic
   _create_app_bundle
+}
+
+_compile_swift_tools() {
+  local src_dir="$BIGIDE_REPO_ROOT/src/swift"
+  local out_dir="$BIGIDE_HOME/tools"
+  mkdir -p "$out_dir"
+
+  # bigide-imgview (image viewer)
+  local src="$src_dir/bigide-imgview.swift"
+  local bin="$out_dir/bigide-imgview"
+  if [[ -f "$src" ]]; then
+    if [[ ! -f "$bin" ]] || [[ "$src" -nt "$bin" ]]; then
+      log "INFO" "Compilazione bigide-imgview..."
+      if swiftc -O "$src" -o "$bin" 2>/dev/null; then
+        chmod +x "$bin"
+        log "INFO" "bigide-imgview compilato"
+      else
+        log "WARN" "Compilazione bigide-imgview fallita (serve Xcode CLI tools)"
+      fi
+    fi
+  fi
+
+  # bigide-docview (document viewer con QLPreviewView)
+  src="$src_dir/bigide-docview.swift"
+  bin="$out_dir/bigide-docview"
+  if [[ -f "$src" ]]; then
+    if [[ ! -f "$bin" ]] || [[ "$src" -nt "$bin" ]]; then
+      log "INFO" "Compilazione bigide-docview..."
+      if swiftc -O "$src" -o "$bin" -framework Quartz 2>/dev/null; then
+        chmod +x "$bin"
+        log "INFO" "bigide-docview compilato"
+      else
+        log "WARN" "Compilazione bigide-docview fallita (serve Xcode CLI tools)"
+      fi
+    fi
+  fi
+
+  # bigide-vidview (video viewer con AVPlayerView)
+  src="$src_dir/bigide-vidview.swift"
+  bin="$out_dir/bigide-vidview"
+  if [[ -f "$src" ]]; then
+    if [[ ! -f "$bin" ]] || [[ "$src" -nt "$bin" ]]; then
+      log "INFO" "Compilazione bigide-vidview..."
+      if swiftc -O "$src" -o "$bin" -framework AVKit -framework AVFoundation 2>/dev/null; then
+        chmod +x "$bin"
+        log "INFO" "bigide-vidview compilato"
+      else
+        log "WARN" "Compilazione bigide-vidview fallita (serve Xcode CLI tools)"
+      fi
+    fi
+  fi
+
+  # bigide-browser (browser overlay con WKWebView)
+  src="$src_dir/bigide-browser.swift"
+  bin="$out_dir/bigide-browser"
+  if [[ -f "$src" ]]; then
+    if [[ ! -f "$bin" ]] || [[ "$src" -nt "$bin" ]]; then
+      log "INFO" "Compilazione bigide-browser..."
+      if swiftc -O "$src" -o "$bin" -framework WebKit 2>/dev/null; then
+        chmod +x "$bin"
+        log "INFO" "bigide-browser compilato"
+      else
+        log "WARN" "Compilazione bigide-browser fallita (serve Xcode CLI tools)"
+      fi
+    fi
+  fi
 }
 
 _setup_perplexity_mcp() {
