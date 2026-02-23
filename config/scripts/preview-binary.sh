@@ -3,6 +3,7 @@
 # Usa timg per immagini/video; qlmanage thumbnail per PDF/Office
 # q / Esc per chiudere
 
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 FILEPATH="$1"
 
 tmux display-popup \
