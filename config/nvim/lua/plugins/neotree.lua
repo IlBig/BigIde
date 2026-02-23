@@ -36,6 +36,7 @@ local function is_text(name)
 end
 
 local PREVIEW_SCRIPT        = vim.fn.expand("$HOME") .. "/.bigide/scripts/preview-file.sh"
+local PREVIEW_IMAGE_SCRIPT  = vim.fn.expand("$HOME") .. "/.bigide/scripts/preview-image.sh"
 local PREVIEW_BINARY_SCRIPT = vim.fn.expand("$HOME") .. "/.bigide/scripts/preview-binary.sh"
 
 local IMAGE_EXT = {
@@ -53,52 +54,12 @@ local function open_preview(filepath)
   vim.fn.jobstart({ "bash", PREVIEW_SCRIPT, filepath }, { detach = true })
 end
 
--- Mostra immagine in floating window con image.nvim (Kitty protocol, alta qualità)
--- Fallback: tmux popup con chafa (block chars) se image.nvim non disponibile
-local function open_image_float(filepath)
-  local ok, image_api = pcall(require, "image")
-  if not ok then
-    -- fallback block chars
-    vim.fn.jobstart({ "bash", PREVIEW_BINARY_SCRIPT, filepath }, {
-      on_exit = function() vim.schedule(function() vim.cmd("redraw!") end) end,
-    })
-    return
-  end
-
-  local W   = math.floor(vim.o.columns * 0.82)
-  local H   = math.floor(vim.o.lines   * 0.82)
-  local row = math.floor((vim.o.lines   - H) / 2)
-  local col = math.floor((vim.o.columns - W) / 2)
-
-  local buf = vim.api.nvim_create_buf(false, true)
-  vim.bo[buf].bufhidden = "wipe"
-
-  local win = vim.api.nvim_open_win(buf, true, {
-    relative = "editor",
-    width = W, height = H,
-    row = row, col = col,
-    style  = "minimal",
-    border = "single",
-    zindex = 200,
-  })
-
-  local close = function()
-    pcall(vim.api.nvim_win_close, win, true)
-    vim.schedule(function() vim.cmd("redraw!") end)
-  end
-  for _, k in ipairs({ "q", "<Esc>", "<CR>", "<Space>" }) do
-    vim.keymap.set("n", k, close, { buffer = buf, silent = true })
-  end
-
-  local img = image_api.from_file(filepath, {
-    window = win, buffer = buf, with_virtual_padding = true,
-  })
-  if img then img:render() end
-end
-
 local function open_preview_binary(filepath)
   if is_image(vim.fn.fnamemodify(filepath, ":t")) then
-    open_image_float(filepath)
+    -- tmux popup centrato (90% schermo) con neovim+image.nvim → qualità nativa
+    vim.fn.jobstart({ "bash", PREVIEW_IMAGE_SCRIPT, filepath }, {
+      on_exit = function() vim.schedule(function() vim.cmd("redraw!") end) end,
+    })
   else
     -- Video, PDF, Office → tmux popup con chafa
     vim.fn.jobstart({ "bash", PREVIEW_BINARY_SCRIPT, filepath }, {

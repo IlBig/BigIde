@@ -12,6 +12,10 @@ return {
     max_width_window_percentage  = 90,
     max_height_window_percentage = 90,
     tmux_show_only_in_active_window = true,
-    hijack_file_patterns = {},  -- non intercettare apertura file automaticamente
+    hijack_file_patterns = {
+      "*.png", "*.jpg", "*.jpeg", "*.gif", "*.webp",
+      "*.heic", "*.heif", "*.bmp", "*.tiff", "*.tif",
+      "*.avif", "*.svg",
+    },
   },
 }
