@@ -19,17 +19,12 @@ vim.opt.showmode   = false
 vim.opt.showtabline = 0
 
 -- Setup image.nvim con fallback: Kitty → Sixel
--- Nota: image.nvim potrebbe fallire in ambienti non-PTY (es. tmux display-popup)
--- ma continuerà a funzionare in sesisoni tmux regolari
 local ok, image = pcall(require, "image")
 if ok then
-  -- Tenta Kitty protocol (primario), fallback a sixel se non disponibile
   local backends_to_try = { "kitty", "sixel" }
   local backend_used = nil
 
-  -- Supprimere i warning di image.nvim aggiungendo una source temporanea
-  -- che cattura e scarta i messaggi di errore di terminal size
-  vim.opt.shortmess:append("T")  -- Suppress "truncated" message
+  vim.opt.shortmess:append("T")
 
   for _, backend in ipairs(backends_to_try) do
     local cfg_attempt = {
@@ -39,7 +34,6 @@ if ok then
         "*.png","*.jpg","*.jpeg","*.gif","*.webp",
         "*.heic","*.heif","*.bmp","*.tiff","*.tif","*.svg","*.avif",
       },
-      -- Usa percentuali della finestra (documentazione ufficiale image.nvim)
       max_width_window_percentage = 90,
       max_height_window_percentage = 90,
       scale_factor = 1.0,
@@ -61,12 +55,10 @@ if ok then
   end
 
   if backend_used then
-    -- Esplicita render dell'immagine all'avvio
     vim.schedule(function()
       vim.cmd("silent! edit! %")
     end)
   else
-    -- Fallback: visualizza le informazioni del file se image.nvim non riesce
     vim.notify("Anteprima immagine non disponibile in questo ambiente", vim.log.levels.INFO)
   end
 else
