@@ -16,6 +16,8 @@ background-blur-radius = 15
 title = BigIDE
 confirm-close-surface = false
 fullscreen = true
+macos-non-native-fullscreen = false
+window-save-state = never
 # Padding zero: elimina spazio interno Ghostty che si somma ai bordi tmux
 window-padding-x = 0
 window-padding-y = 0

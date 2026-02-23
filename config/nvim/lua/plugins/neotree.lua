@@ -35,18 +35,20 @@ local function is_text(name)
   return ext ~= nil and TEXT_EXT[ext:lower()] == 1
 end
 
-local PREVIEW_SCRIPT = vim.fn.expand("$HOME") .. "/.bigide/scripts/preview-file.sh"
+local PREVIEW_SCRIPT        = vim.fn.expand("$HOME") .. "/.bigide/scripts/preview-file.sh"
+local PREVIEW_BINARY_SCRIPT = vim.fn.expand("$HOME") .. "/.bigide/scripts/preview-binary.sh"
 
 local function open_preview(filepath)
-  -- tmux display-popup: si apre centrato sull'intera finestra Ghostty, non sul pannello nvim
-  vim.fn.jobstart({
-    "bash", PREVIEW_SCRIPT, filepath
-  }, { detach = true })
+  vim.fn.jobstart({ "bash", PREVIEW_SCRIPT, filepath }, { detach = true })
 end
 
-local function open_with_system(filepath)
-  -- Apre il file con l'applicazione predefinita del sistema (macOS: open)
-  vim.fn.jobstart({ "open", filepath }, { detach = true })
+local function open_preview_binary(filepath)
+  -- on_exit: redraw! dopo chiusura popup per ripristinare cursore e display neo-tree
+  vim.fn.jobstart({ "bash", PREVIEW_BINARY_SCRIPT, filepath }, {
+    on_exit = function()
+      vim.schedule(function() vim.cmd("redraw!") end)
+    end,
+  })
 end
 
 local function handle_node(state)
@@ -57,7 +59,7 @@ local function handle_node(state)
     if is_text(node.name) then
       open_preview(node.path)
     else
-      open_with_system(node.path)
+      open_preview_binary(node.path)
     end
   end
 end
@@ -113,6 +115,7 @@ return {
         ["S"]             = false,
         ["t"]             = false,
         ["w"]             = false,
+        ["<Space>"]       = false,   -- evita apertura which-key menu
         ["<LeftMouse>"]   = "focus",
         ["<2-LeftMouse>"] = handle_node,
       },
