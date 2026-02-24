@@ -45,7 +45,10 @@ create_layout() {
 
   load_layout_vars "$layout_name"
 
-  tmux rename-window -t "$session_name":0 "main"
+  # Nome window = nome cartella progetto (non "main")
+  local project_name
+  project_name="$(tmux display-message -p -t "$session_name":0 '#{b:session_path}')" || project_name="main"
+  tmux rename-window -t "$session_name":0 "$project_name"
 
   full_pane="$(tmux display-message -p -t "$session_name":0.0 '#{pane_id}')"
 

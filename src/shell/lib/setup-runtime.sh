@@ -4,6 +4,9 @@ set -euo pipefail
 init_runtime() {
   mkdir -p "$BIGIDE_HOME"/{tmux,yazi,nvim,mcp,layouts,logs,scripts,tools}
 
+  # Persisti repo root per auto-reload degli script in sviluppo
+  echo "$BIGIDE_REPO_ROOT" > "$BIGIDE_HOME/.repo_root"
+
   # Configurazione utente (non sovrascrivere se esiste)
   [[ -f "$BIGIDE_HOME/config.json" ]] || cp "$BIGIDE_REPO_ROOT/config/default-config.json" "$BIGIDE_HOME/config.json"
 
