@@ -125,6 +125,7 @@ class ImageViewController: NSObject {
         panel.contentView?.addSubview(counterLabel)
 
         buildFileTree(for: imagePath)
+        writeCurrentPath()
     }
 
     // MARK: - Scansione ricorsiva albero (depth-first)
@@ -198,7 +199,7 @@ class ImageViewController: NSObject {
         if let idx = allFiles.firstIndex(of: newPath) { allIndex = idx }
     }
 
-    /// ↑/↓ — naviga tutti i file. Ritorna false se transizione a non-immagine
+    /// ↑/↓ — naviga tutti i file. Stesso tipo: fluido interno. Altro tipo: delega neo-tree
     func navigateAll(delta: Int) -> Bool {
         guard allFiles.count > 1 else { return true }
         let newIndex = (allIndex + delta + allFiles.count) % allFiles.count
@@ -210,8 +211,9 @@ class ImageViewController: NSObject {
             if let idx = imageFiles.firstIndex(of: newPath) { imageIndex = idx }
             return true
         } else {
-            // Transizione a file non-immagine
-            try? newPath.write(toFile: "/tmp/bigide-imgview-next", atomically: true, encoding: .utf8)
+            // Cambio tipo: direzione + path fallback per neo-tree
+            let direction = delta > 0 ? "down" : "up"
+            try? "\(direction)\n\(newPath)".write(toFile: "/tmp/bigide-imgview-next", atomically: true, encoding: .utf8)
             return false
         }
     }
@@ -220,6 +222,12 @@ class ImageViewController: NSObject {
         guard let newImage = NSImage(contentsOfFile: path) else { return }
         imageView.image = newImage
         updateLabels()
+        writeCurrentPath()
+    }
+
+    private func writeCurrentPath() {
+        guard !allFiles.isEmpty, allIndex < allFiles.count else { return }
+        try? allFiles[allIndex].write(toFile: "/tmp/bigide-viewer-current", atomically: true, encoding: .utf8)
     }
 
     private func updateLabels() {

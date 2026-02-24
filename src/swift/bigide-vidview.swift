@@ -126,6 +126,7 @@ class VideoViewController: NSObject {
         panel.contentView?.addSubview(counterLabel)
 
         buildFileTree(for: videoPath)
+        writeCurrentPath()
         player.play()
     }
 
@@ -200,7 +201,7 @@ class VideoViewController: NSObject {
         if let idx = allFiles.firstIndex(of: newPath) { allIndex = idx }
     }
 
-    /// ↑/↓ — naviga tutti i file. Ritorna false se transizione a non-video
+    /// ↑/↓ — naviga tutti i file. Stesso tipo: fluido interno. Altro tipo: delega neo-tree
     func navigateAll(delta: Int) -> Bool {
         guard allFiles.count > 1 else { return true }
         let newIndex = (allIndex + delta + allFiles.count) % allFiles.count
@@ -212,8 +213,9 @@ class VideoViewController: NSObject {
             if let idx = videoFiles.firstIndex(of: newPath) { videoIndex = idx }
             return true
         } else {
-            // Transizione a file non-video
-            try? newPath.write(toFile: "/tmp/bigide-vidview-next", atomically: true, encoding: .utf8)
+            // Cambio tipo: direzione + path fallback per neo-tree
+            let direction = delta > 0 ? "down" : "up"
+            try? "\(direction)\n\(newPath)".write(toFile: "/tmp/bigide-vidview-next", atomically: true, encoding: .utf8)
             return false
         }
     }
@@ -225,6 +227,12 @@ class VideoViewController: NSObject {
         player.replaceCurrentItem(with: item)
         player.play()
         updateLabels()
+        writeCurrentPath()
+    }
+
+    private func writeCurrentPath() {
+        guard !allFiles.isEmpty, allIndex < allFiles.count else { return }
+        try? allFiles[allIndex].write(toFile: "/tmp/bigide-viewer-current", atomically: true, encoding: .utf8)
     }
 
     private func updateLabels() {

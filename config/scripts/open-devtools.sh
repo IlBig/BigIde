@@ -1,16 +1,22 @@
 #!/usr/bin/env bash
 # BigIDE — Toggle Chrome 50/50 con Ghostty
-# prefix+c: apre Chrome reale a destra (50%) con porta debug 9222
-# Ripete: chiude split e ripristina Ghostty fullscreen
+# prefix+c: apre NUOVA finestra Chrome a destra (50%) — sessione reale
+# Ripete: chiude finestra Chrome e ripristina Ghostty fullscreen
 
 STATE_FILE="/tmp/bigide-chrome-active"
 
 if [[ -f "$STATE_FILE" ]]; then
-    # Chrome split attivo → ripristina Ghostty fullscreen
+    # Chrome split attivo → chiudi finestra e ripristina Ghostty
     rm -f "$STATE_FILE"
     osascript <<'AS'
+-- Chiudi la finestra Chrome che abbiamo aperto
+tell application "Google Chrome"
+    if (count of windows) > 0 then
+        close window 1
+    end if
+end tell
+-- Ghostty → fullscreen
 tell application "System Events"
-    -- Ghostty → fullscreen
     tell application process "Ghostty"
         tell window 1
             set position to {0, 0}
@@ -18,19 +24,21 @@ tell application "System Events"
         end tell
         set frontmost to true
     end tell
-    -- Nascondi Chrome (non chiude — preserva sessione/tab)
-    if exists application process "Google Chrome" then
-        set visible of application process "Google Chrome" to false
-    end if
 end tell
 AS
 else
-    # Apri Chrome in split 50/50
+    # Apri Chrome in split 50/50 (SEMPRE nuova finestra)
     touch "$STATE_FILE"
-    # Chiudi eventuale split Safari
     rm -f /tmp/bigide-safari-active
+    # Chiudi eventuale Safari split
     osascript <<'AS'
--- Dimensioni schermo
+tell application "System Events"
+    if exists application process "Safari" then
+        set visible of application process "Safari" to false
+    end if
+end tell
+AS
+    osascript <<'AS'
 tell application "Finder"
     set db to bounds of window of desktop
     set sw to item 3 of db
@@ -38,12 +46,8 @@ tell application "Finder"
 end tell
 set hw to sw div 2
 
+-- Ghostty → metà sinistra
 tell application "System Events"
-    -- Nascondi Safari se visibile
-    if exists application process "Safari" then
-        set visible of application process "Safari" to false
-    end if
-    -- Ghostty → metà sinistra
     tell application process "Ghostty"
         tell window 1
             set position to {0, 0}
@@ -52,10 +56,12 @@ tell application "System Events"
     end tell
 end tell
 
--- Chrome → metà destra (con debug port per DevTools)
+-- Chrome: SEMPRE nuova finestra (come Cmd+N)
 tell application "Google Chrome"
+    make new window
+    delay 0.5
     activate
-    if (count of windows) = 0 then make new window
+    -- Posiziona la nuova finestra a destra
     set bounds of window 1 to {hw, 0, sw, sh}
 end tell
 AS

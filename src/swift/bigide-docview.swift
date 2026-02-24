@@ -23,8 +23,10 @@ class DocPreviewItem: NSObject, QLPreviewItem {
 class DocViewController: NSObject {
     let panel: DocPanel
     let previewView: QLPreviewView
+    let pdfView: PDFView
     let label: NSTextField
     let counterLabel: NSTextField
+    var isPDF: Bool = false
 
     // Lista piatta di TUTTI i file nell'albero (depth-first, attraversa cartelle)
     var allFiles: [String] = []
@@ -89,6 +91,14 @@ class DocViewController: NSObject {
         previewView.autoresizingMask = [.width, .height]
         previewView.autostarts = true
 
+        // PDFView — usato direttamente per i PDF (QLPreviewView sovrascrive le impostazioni)
+        pdfView = PDFView(frame: previewFrame)
+        pdfView.autoresizingMask = [.width, .height]
+        pdfView.displayMode = .singlePage
+        pdfView.autoScales = true
+        pdfView.backgroundColor = .clear
+        pdfView.isHidden = true
+
         // Path relativo in basso (centro)
         let labelFrame = NSRect(
             x: padding,
@@ -125,12 +135,14 @@ class DocViewController: NSObject {
         super.init()
 
         panel.contentView?.addSubview(previewView)
+        panel.contentView?.addSubview(pdfView)
         panel.contentView?.addSubview(label)
         panel.contentView?.addSubview(counterLabel)
 
         // Carica il documento iniziale
         showDocument(at: docPath)
         buildFileTree(for: docPath)
+        writeCurrentPath()
     }
 
     // MARK: - Scansione ricorsiva albero (depth-first)
@@ -204,7 +216,7 @@ class DocViewController: NSObject {
         if let idx = allFiles.firstIndex(of: newPath) { allIndex = idx }
     }
 
-    /// ↑/↓ — naviga tutti i file. Ritorna false se transizione a non-documento
+    /// ↑/↓ — naviga tutti i file. Stesso tipo: fluido interno. Altro tipo: delega neo-tree
     func navigateAll(delta: Int) -> Bool {
         guard allFiles.count > 1 else { return true }
         let newIndex = (allIndex + delta + allFiles.count) % allFiles.count
@@ -216,41 +228,42 @@ class DocViewController: NSObject {
             if let idx = docFiles.firstIndex(of: newPath) { docIndex = idx }
             return true
         } else {
-            // Transizione a file non-documento
-            try? newPath.write(toFile: "/tmp/bigide-docview-next", atomically: true, encoding: .utf8)
+            // Cambio tipo: direzione + path fallback per neo-tree
+            let direction = delta > 0 ? "down" : "up"
+            try? "\(direction)\n\(newPath)".write(toFile: "/tmp/bigide-docview-next", atomically: true, encoding: .utf8)
             return false
         }
     }
 
     private func showDocument(at path: String) {
         let url = URL(fileURLWithPath: path)
-        previewView.previewItem = DocPreviewItem(url: url)
-        updateLabels()
+        let ext = (path as NSString).pathExtension.lowercased()
 
-        // Dopo che QLPreviewView ha caricato il PDF, imposta zoom "fit page"
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
-            self?.applyFitPageZoom()
-        }
-    }
-
-    /// Cerca ricorsivamente un PDFView nella gerarchia di QLPreviewView e imposta autoScales
-    private func applyFitPageZoom() {
-        if let pdfView = findPDFView(in: previewView) {
-            pdfView.autoScales = true
-            pdfView.scaleFactor = pdfView.scaleFactorForSizeToFit
-        }
-    }
-
-    private func findPDFView(in view: NSView) -> PDFView? {
-        if let pdfView = view as? PDFView {
-            return pdfView
-        }
-        for subview in view.subviews {
-            if let found = findPDFView(in: subview) {
-                return found
+        if ext == "pdf" {
+            // PDF → usa PDFView direttamente (QLPreviewView sovrascrive le impostazioni)
+            isPDF = true
+            previewView.isHidden = true
+            pdfView.isHidden = false
+            if let doc = PDFDocument(url: url) {
+                pdfView.document = doc
+                pdfView.displayMode = .singlePage
+                pdfView.autoScales = true
             }
+        } else {
+            // Altri documenti → QLPreviewView
+            isPDF = false
+            pdfView.isHidden = true
+            previewView.isHidden = false
+            previewView.previewItem = DocPreviewItem(url: url)
         }
-        return nil
+
+        updateLabels()
+        writeCurrentPath()
+    }
+
+    private func writeCurrentPath() {
+        guard !allFiles.isEmpty, allIndex < allFiles.count else { return }
+        try? allFiles[allIndex].write(toFile: "/tmp/bigide-viewer-current", atomically: true, encoding: .utf8)
     }
 
     private func updateLabels() {

@@ -1,6 +1,6 @@
 -- neo-tree: file explorer VSCode-like per BigIDE
--- Cartelle: espandi/collassa | File testo: preview modale centrata (q / Esc per chiudere)
--- ↑/↓ naviga tra file (immagini + testo), transizioni automatiche
+-- Cartelle: espandi/collassa | File: preview overlay (q / Esc per chiudere)
+-- ↑/↓ naviga file nell'albero neo-tree | ←/→ naviga stesso tipo nel viewer
 
 local TEXT_EXT = {
   -- Markup / testo
@@ -75,7 +75,6 @@ local function is_text(name, filepath)
     if DOC_EXT[ext] == 1 then return false end
     if VIDEO_EXT[ext] == 1 then return false end
   end
-  -- Fallback: magic number via `file --mime-type` per estensioni sconosciute / assenti
   if filepath then
     local ok, out = pcall(vim.fn.system, { "file", "--mime-type", "--brief", filepath })
     if ok and vim.v.shell_error == 0 then
@@ -104,11 +103,50 @@ local function kill_vidview()
   vim.fn.jobstart({ "pkill", "-x", "bigide-vidview" }, { detach = true })
 end
 
---- Chiudi tutti i viewer overlay attivi
 local function kill_all_viewers()
   kill_imgview()
   kill_docview()
   kill_vidview()
+end
+
+--- State neo-tree salvato da handle_node — usato per navigazione cross-type
+local cached_state = nil
+
+--- Polling cursore: sincronizza neo-tree con ←/→ del viewer Swift
+local viewer_poll_id = nil
+local viewer_poll_last = ""
+
+local function reveal_in_neotree(filepath)
+  pcall(function()
+    require("neo-tree.command").execute({
+      source = "filesystem",
+      reveal_file = filepath,
+    })
+  end)
+end
+
+local function start_viewer_poll()
+  if viewer_poll_id then return end
+  viewer_poll_last = ""
+  viewer_poll_id = vim.fn.timer_start(200, function()
+    local f = io.open("/tmp/bigide-viewer-current", "r")
+    if not f then return end
+    local path = f:read("*a"):gsub("%s+$", "")
+    f:close()
+    if path ~= "" and path ~= viewer_poll_last then
+      viewer_poll_last = path
+      reveal_in_neotree(path)
+    end
+  end, { ["repeat"] = -1 })
+end
+
+local function stop_viewer_poll()
+  if viewer_poll_id then
+    vim.fn.timer_stop(viewer_poll_id)
+    viewer_poll_id = nil
+  end
+  viewer_poll_last = ""
+  os.remove("/tmp/bigide-viewer-current")
 end
 
 local function reset_display()
@@ -118,7 +156,6 @@ local function reset_display()
   end)
 end
 
---- Leggi e cancella un file temporaneo, ritorna il contenuto o nil
 local function read_and_delete(path)
   local f = io.open(path, "r")
   if not f then return nil end
@@ -130,40 +167,123 @@ local function read_and_delete(path)
   return content
 end
 
---- Rivela un file in neo-tree (posiziona il cursore)
-local function reveal_in_neotree(filepath)
-  pcall(function()
-    require("neo-tree.command").execute({
-      source = "filesystem",
-      reveal_file = filepath,
-    })
-  end)
-end
-
---- Imposta nav-root (preserva contesto tra transizioni immagine↔testo)
-local function set_nav_root(filepath)
-  local root_file = "/tmp/bigide-nav-root"
-  local f = io.open(root_file, "r")
-  if f then f:close(); return end  -- gia' impostato
-  f = io.open(root_file, "w")
+--- Log diagnostico
+local function nav_log(msg)
+  local f = io.open("/tmp/bigide-nav.log", "a")
   if f then
-    f:write(vim.fn.getcwd())
+    f:write(os.date("%H:%M:%S") .. " " .. msg .. "\n")
     f:close()
   end
 end
 
-local function clear_nav_root()
-  os.remove("/tmp/bigide-nav-root")
+--- Trova la finestra neo-tree
+local function find_neotree_win()
+  for _, w in ipairs(vim.api.nvim_list_wins()) do
+    local ok, ft = pcall(function() return vim.bo[vim.api.nvim_win_get_buf(w)].filetype end)
+    if ok and ft == "neo-tree" then
+      return w
+    end
+  end
+  -- Fallback: cached state
+  if cached_state and cached_state.winid and vim.api.nvim_win_is_valid(cached_state.winid) then
+    return cached_state.winid
+  end
+  return nil
 end
 
--- Forward declarations per ricorsione mutua
+--- Scrivi nav-root per i viewer Swift (così usano lo stesso albero di neo-tree)
+local function set_nav_root()
+  local root = vim.fn.getcwd()
+  pcall(function()
+    local f = io.open("/tmp/bigide-nav-root", "w")
+    if f then f:write(root); f:close() end
+  end)
+end
+
+--- Muovi cursore neo-tree al prossimo FILE (salta directory), ritorna path o nil
+local function navigate_neotree(delta)
+  -- Usa lo state salvato da handle_node (funziona con position=current)
+  local state = cached_state
+  if not state or not state.tree then
+    nav_log("FAIL: no cached state")
+    return nil
+  end
+
+  local win = find_neotree_win()
+  if not win then
+    nav_log("FAIL: no neo-tree window")
+    return nil
+  end
+
+  nav_log("navigate delta=" .. delta .. " win=" .. win)
+  local cmd = delta > 0 and "j" or "k"
+
+  for _ = 1, 100 do
+    local line = vim.api.nvim_win_get_cursor(win)[1]
+    vim.api.nvim_win_call(win, function()
+      vim.cmd("normal! " .. cmd)
+    end)
+    local new_line = vim.api.nvim_win_get_cursor(win)[1]
+    if new_line == line then
+      nav_log("  edge at line " .. line)
+      return nil
+    end
+
+    local node = state.tree:get_node(new_line)
+    if node and node.type == "file" then
+      nav_log("  -> " .. node.path)
+      return node.path
+    end
+  end
+  nav_log("  exhausted")
+  return nil
+end
+
+--- Gestisci segnale di navigazione: "direzione\npath" o path diretto
+local function handle_nav_signal(signal_file)
+  local signal = read_and_delete(signal_file)
+  if not signal then return false end
+
+  nav_log("signal: " .. signal_file .. " -> " .. signal:gsub("\n", " | "))
+
+  local direction = signal:match("^([^\n]+)")
+  local fallback_path = signal:match("\n(.+)")
+
+  if direction == "up" or direction == "down" then
+    local delta = direction == "down" and 1 or -1
+    local filepath = navigate_neotree(delta)
+    if filepath then
+      nav_log("OK -> " .. filepath)
+      open_any_preview(filepath)
+      return true
+    end
+    if fallback_path and fallback_path:sub(1, 1) == "/" then
+      nav_log("FALLBACK -> " .. fallback_path)
+      reveal_in_neotree(fallback_path)
+      open_any_preview(fallback_path)
+      return true
+    end
+    nav_log("FAILED, no fallback")
+    return true
+  end
+
+  if signal:sub(1, 1) == "/" then
+    reveal_in_neotree(signal)
+    open_any_preview(signal)
+    return true
+  end
+
+  return false
+end
+
+-- Forward declarations
 local open_preview
 local open_preview_image
 local open_preview_doc
 local open_preview_video
 
 --- Apri la preview appropriata per un file qualsiasi
-local function open_any_preview(filepath)
+function open_any_preview(filepath)
   local name = vim.fn.fnamemodify(filepath, ":t")
   if is_image(name) then
     open_preview_image(filepath)
@@ -180,114 +300,84 @@ local function open_any_preview(filepath)
   end
 end
 
---- Callback on_exit della preview testo: gestisce navigazione ↑/↓ tra file
+--- Callback on_exit della preview testo
 local function on_preview_exit()
-  reset_display()
   vim.schedule(function()
-    local next_path = read_and_delete("/tmp/bigide-preview-next")
-    if next_path then
-      reveal_in_neotree(next_path)
-      open_any_preview(next_path)
-      return
-    end
-    -- Chiusura normale — pulisci nav-root
-    clear_nav_root()
+    if handle_nav_signal("/tmp/bigide-preview-next") then return end
+    reset_display()
   end)
 end
 
---- Callback on_exit del viewer immagini: gestisce transizione o sync cursore
+--- Callback on_exit del viewer immagini
 local function on_imgview_exit()
-  reset_display()
   vim.schedule(function()
-    -- Transizione a file non-immagine (↑/↓)
-    local next_path = read_and_delete("/tmp/bigide-imgview-next")
-    if next_path then
-      reveal_in_neotree(next_path)
-      open_any_preview(next_path)
-      return
-    end
-
-    -- Chiusura normale (Esc/q/Spazio) — sync cursore neo-tree + pulisci nav-root
-    clear_nav_root()
+    if handle_nav_signal("/tmp/bigide-imgview-next") then return end
+    reset_display()
     local last_path = read_and_delete("/tmp/bigide-imgview-last")
-    if last_path then
-      reveal_in_neotree(last_path)
-    end
+    if last_path then reveal_in_neotree(last_path) end
   end)
 end
 
---- Callback on_exit del viewer documenti: gestisce transizione o sync cursore
+--- Callback on_exit del viewer documenti
 local function on_docview_exit()
-  reset_display()
   vim.schedule(function()
-    -- Transizione a file non-documento (↑/↓)
-    local next_path = read_and_delete("/tmp/bigide-docview-next")
-    if next_path then
-      reveal_in_neotree(next_path)
-      open_any_preview(next_path)
-      return
-    end
-
-    -- Chiusura normale (Esc/q/Spazio) — sync cursore neo-tree + pulisci nav-root
-    clear_nav_root()
+    if handle_nav_signal("/tmp/bigide-docview-next") then return end
+    reset_display()
     local last_path = read_and_delete("/tmp/bigide-docview-last")
-    if last_path then
-      reveal_in_neotree(last_path)
-    end
+    if last_path then reveal_in_neotree(last_path) end
   end)
 end
 
---- Callback on_exit del viewer video: gestisce transizione o sync cursore
+--- Callback on_exit del viewer video
 local function on_vidview_exit()
-  reset_display()
   vim.schedule(function()
-    local next_path = read_and_delete("/tmp/bigide-vidview-next")
-    if next_path then
-      reveal_in_neotree(next_path)
-      open_any_preview(next_path)
-      return
-    end
-    clear_nav_root()
+    if handle_nav_signal("/tmp/bigide-vidview-next") then return end
+    reset_display()
     local last_path = read_and_delete("/tmp/bigide-vidview-last")
-    if last_path then
-      reveal_in_neotree(last_path)
-    end
+    if last_path then reveal_in_neotree(last_path) end
   end)
 end
 
---- Preview video con on_exit per navigazione
+--- Preview video
 open_preview_video = function(filepath)
-  kill_all_viewers()
-  set_nav_root(filepath)
+  kill_imgview()
+  kill_docview()
+  set_nav_root()
+  start_viewer_poll()
   vim.fn.jobstart({ "bash", PREVIEW_VIDEO_SCRIPT, filepath }, {
-    on_exit = function() on_vidview_exit() end,
+    on_exit = function() stop_viewer_poll(); on_vidview_exit() end,
   })
 end
 
---- Preview documento con on_exit per navigazione
+--- Preview documento
 open_preview_doc = function(filepath)
-  kill_all_viewers()
-  set_nav_root(filepath)
+  kill_imgview()
+  kill_vidview()
+  set_nav_root()
+  start_viewer_poll()
   vim.fn.jobstart({ "bash", PREVIEW_DOC_SCRIPT, filepath }, {
-    on_exit = function() on_docview_exit() end,
+    on_exit = function() stop_viewer_poll(); on_docview_exit() end,
   })
 end
 
---- Preview testo con on_exit per navigazione
+--- Preview testo (tmux popup)
 open_preview = function(filepath)
   kill_all_viewers()
-  set_nav_root(filepath)
+  stop_viewer_poll()
+  set_nav_root()
   vim.fn.jobstart({ "bash", PREVIEW_SCRIPT, filepath }, {
     on_exit = function() on_preview_exit() end,
   })
 end
 
---- Preview immagine con on_exit per navigazione
+--- Preview immagine
 open_preview_image = function(filepath)
-  kill_all_viewers()
-  set_nav_root(filepath)
+  kill_docview()
+  kill_vidview()
+  set_nav_root()
+  start_viewer_poll()
   vim.fn.jobstart({ "bash", PREVIEW_IMAGE_SCRIPT, filepath }, {
-    on_exit = function() on_imgview_exit() end,
+    on_exit = function() stop_viewer_poll(); on_imgview_exit() end,
   })
 end
 
@@ -316,6 +406,9 @@ local function open_preview_binary(filepath)
 end
 
 local function handle_node(state)
+  -- Salva lo state per navigazione cross-type (navigate_neotree)
+  cached_state = state
+
   local node = state.tree:get_node()
   if node.type == "directory" then
     require("neo-tree.sources.filesystem.commands").open(state)
@@ -383,8 +476,7 @@ return {
         ["S"]             = false,
         ["t"]             = false,
         ["w"]             = false,
-        ["<Space>"]       = false,   -- evita apertura which-key menu
-        ["<LeftMouse>"]   = "focus",
+        ["<Space>"]       = false,
         ["<2-LeftMouse>"] = handle_node,
       },
     },

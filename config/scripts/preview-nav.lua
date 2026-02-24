@@ -1,101 +1,52 @@
--- BigIDE preview navigation (scansione ricorsiva albero)
--- ↑/↓ cambia file (attraversa cartelle) | Enter: leggi | Esc: chiudi
+-- BigIDE preview navigation — ↑/↓ delega a neo-tree
+-- ↑/↓ cambia file | Enter: leggi | Esc/q: chiudi
 -- Caricato da preview-file.sh quando BIGIDE_PREVIEW=1
 
 local current_file = vim.fn.expand("%:p")
+local filename = vim.fn.fnamemodify(current_file, ":t")
+local current_dir = vim.fn.fnamemodify(current_file, ":h")
 
--- Cartelle da ignorare
-local SKIP_DIRS = {
-  node_modules=1, __pycache__=1, [".git"]=1, [".svn"]=1, [".hg"]=1,
-  build=1, dist=1, [".next"]=1, [".nuxt"]=1, target=1,
-  [".cache"]=1, [".tmp"]=1, vendor=1, Pods=1, [".build"]=1,
-}
+-- Trova file adiacente nella stessa directory (fallback se navigate_neotree fallisce)
+local function find_adjacent_file(delta)
+  local ok, entries = pcall(vim.fn.readdir, current_dir)
+  if not ok then return nil end
 
--- Leggi nav-root (preservato tra transizioni) o usa la dir del file
-local nav_root
-local rf = io.open("/tmp/bigide-nav-root", "r")
-if rf then
-  nav_root = rf:read("*a"):gsub("%s+$", "")
-  rf:close()
-  if nav_root == "" then nav_root = nil end
-end
-if not nav_root then
-  nav_root = vim.fn.fnamemodify(current_file, ":h")
-end
-
--- Scansione ricorsiva depth-first (stessa logica del viewer Swift)
-local all_files = {}
-local MAX_FILES = 5000
-
-local function walk_dir(dir, max_depth)
-  if max_depth <= 0 or #all_files >= MAX_FILES then return end
-  local ok, entries = pcall(vim.fn.readdir, dir)
-  if not ok then return end
-
-  -- Separa cartelle e file, ordina ciascun gruppo (come neo-tree: cartelle prima)
-  local dirs = {}
+  -- Solo file (no directory), ordinati
   local files = {}
   for _, name in ipairs(entries) do
     if not name:match("^%.") then
-      local path = dir .. "/" .. name
-      if vim.fn.isdirectory(path) == 1 then
-        table.insert(dirs, name)
-      else
-        table.insert(files, name)
+      local path = current_dir .. "/" .. name
+      if vim.fn.isdirectory(path) == 0 then
+        table.insert(files, path)
       end
     end
   end
-  table.sort(dirs)
   table.sort(files)
 
-  -- Prima ricorri nelle cartelle
-  for _, name in ipairs(dirs) do
-    if not SKIP_DIRS[name] then
-      walk_dir(dir .. "/" .. name, max_depth - 1)
+  for i, path in ipairs(files) do
+    if path == current_file then
+      local ni = ((i - 1 + delta) % #files) + 1
+      return files[ni]
     end
   end
-
-  -- Poi aggiungi i file
-  for _, name in ipairs(files) do
-    table.insert(all_files, dir .. "/" .. name)
-  end
+  return nil
 end
 
-walk_dir(nav_root, 8)
-
--- Trova posizione corrente
-local current_idx = 1
-for i, path in ipairs(all_files) do
-  if path == current_file then
-    current_idx = i
-    break
-  end
-end
-
--- Path relativo dalla root
-local function rel_path(path)
-  local prefix = nav_root .. "/"
-  if path:sub(1, #prefix) == prefix then
-    return path:sub(#prefix + 1)
-  end
-  return vim.fn.fnamemodify(path, ":t")
-end
-
--- Naviga al file precedente/successivo: scrivi path e chiudi
+-- Naviga: scrivi direzione + path fallback e chiudi
 local function navigate(delta)
-  if #all_files <= 1 then return end
-  local new_idx = ((current_idx - 1 + delta) % #all_files) + 1
-  local next_path = all_files[new_idx]
-  local f = io.open("/tmp/bigide-preview-next", "w")
-  if f then
-    f:write(next_path)
-    f:close()
+  local direction = delta > 0 and "down" or "up"
+  local fallback = find_adjacent_file(delta)
+  local content = direction
+  if fallback then
+    content = direction .. "\n" .. fallback
   end
+  local f = io.open("/tmp/bigide-preview-next", "w")
+  if f then f:write(content); f:close() end
   vim.cmd("quit!")
 end
 
 local function setup_browse_mode()
-  -- ↑/↓ naviga file (attraversa cartelle)
+  -- ↑/↓ naviga file (delega a neo-tree)
   vim.keymap.set("n", "<Up>", function() navigate(-1) end, { buffer = 0, nowait = true })
   vim.keymap.set("n", "<Down>", function() navigate(1) end, { buffer = 0, nowait = true })
 
@@ -115,8 +66,7 @@ local function setup_browse_mode()
 
   vim.api.nvim_echo(
     {{"  ↑↓ naviga file  |  Enter: leggi  |  Esc: chiudi  ", "Comment"},
-     {rel_path(current_file) .. "  ", "String"},
-     {"(" .. current_idx .. "/" .. #all_files .. ")", "NonText"}},
+     {filename, "String"}},
     false, {}
   )
 end
