@@ -16,6 +16,7 @@ _BREW_DEPS=(
   "timg:timg"           # anteprima video nel terminale
   "chafa:chafa"         # fallback rendering immagini (block chars)
   "imagemagick:convert" # image.nvim: decodifica immagini per preview neovim float
+  "lazygit:lazygit"     # TUI git completa (prefix + g g)
 )
 _BREW_CASKS=(ghostty)
 _NPM_GLOBALS=("@anthropic-ai/claude-code:claude" "perplexity-cli:perplexity")
