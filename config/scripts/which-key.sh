@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# BigIDE — Which-Key help popup
+# Mostra tutti i keybinding disponibili con stile Tokyo Night
+# Chiamato da tmux popup (prefix + ?)
+set -euo pipefail
+
+# ─── Colori Tokyo Night (RGB) ──────────────────────────────────────────────
+B=$'\033[38;2;122;162;247m'     # blue   #7aa2f7
+C=$'\033[38;2;125;207;255m'     # cyan   #7dcfff
+G=$'\033[38;2;158;206;106m'     # green  #9ece6a
+P=$'\033[38;2;187;154;247m'     # purple #bb9af7
+W=$'\033[38;2;192;202;245m'     # white  #c0caf5
+D=$'\033[38;2;86;95;137m'       # dim    #565f89
+O=$'\033[38;2;255;158;100m'     # orange #ff9e64
+BOLD=$'\033[1m'
+R=$'\033[0m'
+
+clear
+
+printf "\n"
+printf "  ${BOLD}${B}  BigIDE — Keybinding${R}\n"
+printf "  ${D}──────────────────────────────────────${R}\n"
+printf "\n"
+printf "  ${BOLD}${P}Navigazione${R}\n"
+printf "    ${C}← → ↑ ↓${R}   ${W}Naviga pannelli${R}\n"
+printf "    ${C}1 2 3 4 5${R}  ${W}Pannello diretto${R}\n"
+printf "    ${C}z${R}          ${W}Zoom pannello${R}\n"
+printf "    ${C}e${R}          ${W}Toggle file tree${R}\n"
+printf "\n"
+printf "  ${BOLD}${P}Progetti${R}\n"
+printf "    ${C}a${R}          ${W}Apri progetto${R}\n"
+printf "    ${C}Tab${R}        ${W}Tab successivo${R}\n"
+printf "    ${C}S-Tab${R}      ${W}Tab precedente${R}\n"
+printf "\n"
+printf "  ${BOLD}${P}Strumenti${R}\n"
+printf "    ${C}Spazio${R}     ${W}Cerca file${R}\n"
+printf "    ${C}v${R}          ${W}Dettatura vocale${R}\n"
+printf "    ${C}p${R}          ${W}Perplexity${R}\n"
+printf "    ${C}s${R}          ${W}Safari split${R}\n"
+printf "    ${C}c${R}          ${W}Chrome DevTools${R}\n"
+printf "\n"
+printf "  ${BOLD}${P}Git${R}  ${D}(prefix + g, poi:)${R}\n"
+printf "    ${C}b${R}          ${W}Branch switch${R}  ${D}fzf${R}\n"
+printf "    ${C}c${R}          ${W}Commit${R}         ${D}add -A + msg${R}\n"
+printf "    ${C}p${R}          ${W}Push${R}\n"
+printf "    ${C}s${R}          ${W}Status${R}\n"
+printf "    ${C}l${R}          ${W}Log${R}            ${D}graph${R}\n"
+printf "    ${C}g${R}          ${W}Lazygit${R}        ${D}TUI completa${R}\n"
+printf "\n"
+printf "  ${BOLD}${P}Sessione${R}\n"
+printf "    ${C}Esc${R}        ${W}Chiudi sessione${R}\n"
+printf "    ${C}Q${R}          ${W}Chiudi (conferma)${R}\n"
+printf "\n"
+printf "  ${D}Premi q o Esc per chiudere${R}\n"
+printf "\n"
+
+# Attendi un tasto per chiudere
+read -rsn1

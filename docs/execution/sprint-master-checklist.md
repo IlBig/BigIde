@@ -6,12 +6,9 @@
 - [x] Story 1.3: Script Bootstrap `bigide` con Splash Screen (baseline)
 - [x] Story 1.4: Navigazione Pannelli e Keybinding (baseline)
 - [x] Story 1.5: Status Bar Superiore e Git Bar Inferiore (baseline)
-- [ ] Story 1.6: Which-Key Banner e Scopribilità Keybinding
+- [x] Story 1.6: Which-Key Banner e Scopribilità Keybinding
 
-## Sprint 2 — Epic 2
-- [ ] Story 2.1: File Browser Yazi con Navigazione e Anteprime Immagini
-- [ ] Story 2.2: Anteprime Documenti Office e PDF via Quick Look
-- [ ] Story 2.3: Editor LazyVim Overlay da Yazi
+## Sprint 2 — Epic 2 (rimosso — funzionalità coperte altrove)
 
 ## Sprint 3 — Epic 3
 - [x] Story 3.1: Scaffold MCP Server e Infrastruttura
@@ -21,12 +18,12 @@
 
 ## Sprint 4 — Epic 4
 - [x] Story 4.1: Tool MCP `open_browser` e Apertura Chrome (baseline)
-- [ ] Story 4.2: Scelta Layout Browser e Posizionamento Automatico
+- [ ] Story 4.2: Scelta Layout Browser e Posizionamento Automatico (rimandata — limite Spaces macOS)
 
 ## Sprint 5 — Epic 5
-- [ ] Story 5.1: Git Key Table e Branch Switch con Fuzzy Search
-- [ ] Story 5.2: Commit, Push e Status in Popup
-- [ ] Story 5.3: Lazygit Completo e Interazione Mouse
+- [x] Story 5.1: Git Key Table e Branch Switch con Fuzzy Search
+- [x] Story 5.2: Commit, Push e Status in Popup
+- [x] Story 5.3: Lazygit Completo e Interazione Mouse
 
 ## Sprint 6 — Epic 6
 - [ ] Story 6.1: Verifica e Installazione Automatica Dipendenze
@@ -37,11 +34,11 @@
 ## Sprint 7 — Epic 7
 - [ ] Story 7.1: Tool MCP `create_pane`, `close_pane` e `resize_pane`
 - [ ] Story 7.2: Tool MCP `watch_pane` con Rilevamento Differenze
-- [ ] Story 7.3: Multi-Progetto con Tab Tmux
+- [x] Story 7.3: Multi-Progetto con Tab Tmux
 - [ ] Story 7.4: Pannello Usage Monitor con Claude-Monitor
 
 ## Sprint 8 — Epic 8
-- [ ] Story 8.1: Rilevamento Cartella Vuota e Inizializzazione Automatica Progetto
+- [x] Story 8.1: Rilevamento Cartella Vuota e Inizializzazione Automatica Progetto
 
 ## Sprint 9 — Epic 9
 - [ ] Story 9.1: Integrazione claude-mem come Sistema di Memoria
