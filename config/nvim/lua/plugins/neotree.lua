@@ -200,25 +200,127 @@ local function set_nav_root()
   end)
 end
 
---- Muovi cursore neo-tree al prossimo FILE (salta directory), ritorna path o nil
-local function navigate_neotree(delta)
-  -- Usa lo state salvato da handle_node (funziona con position=current)
+--- Leggi filesystem: ultimo file in una directory (ricorsivo nelle sottocartelle)
+local function fs_last_file(dir_path)
+  local ok, entries = pcall(vim.fn.readdir, dir_path)
+  if not ok or not entries then return nil end
+  local files, subdirs = {}, {}
+  for _, name in ipairs(entries) do
+    if name:sub(1, 1) ~= "." then
+      local full = dir_path .. "/" .. name
+      if vim.fn.isdirectory(full) == 1 then
+        table.insert(subdirs, full)
+      else
+        table.insert(files, full)
+      end
+    end
+  end
+  table.sort(files)
+  if #files > 0 then return files[#files] end
+  table.sort(subdirs)
+  for i = #subdirs, 1, -1 do
+    local result = fs_last_file(subdirs[i])
+    if result then return result end
+  end
+  return nil
+end
+
+--- Leggi filesystem: primo file in una directory (ricorsivo nelle sottocartelle)
+local function fs_first_file(dir_path)
+  local ok, entries = pcall(vim.fn.readdir, dir_path)
+  if not ok or not entries then return nil end
+  local files, subdirs = {}, {}
+  for _, name in ipairs(entries) do
+    if name:sub(1, 1) ~= "." then
+      local full = dir_path .. "/" .. name
+      if vim.fn.isdirectory(full) == 1 then
+        table.insert(subdirs, full)
+      else
+        table.insert(files, full)
+      end
+    end
+  end
+  table.sort(files)
+  if #files > 0 then return files[1] end
+  table.sort(subdirs)
+  for _, subdir in ipairs(subdirs) do
+    local result = fs_first_file(subdir)
+    if result then return result end
+  end
+  return nil
+end
+
+--- Espandi una directory nel tree. Sincrono se già caricata, asincrono altrimenti.
+--- callback() viene chiamato DOPO che i figli sono visibili nel tree.
+local function expand_directory(state, node, callback)
+  if node:is_expanded() then return callback() end
+  if node.loaded == false then
+    -- Asincrono: figli non ancora caricati dal disco
+    require("neo-tree.sources.filesystem").toggle_directory(
+      state, node, nil, false, false, callback
+    )
+  else
+    -- Sincrono: figli già in memoria
+    node:expand()
+    require("neo-tree.ui.renderer").redraw(state)
+    callback()
+  end
+end
+
+--- Espandi le directory lungo il path fino a target_path, poi chiama callback.
+local function expand_path_to(state, dir_line, dir_path, target_path, callback, depth)
+  if depth > 20 then return callback() end
+  local prefix = dir_path .. "/"
+  for offset = 1, 500 do
+    local n = state.tree:get_node(dir_line + offset)
+    if not n or not n.path then break end
+    if n.path:sub(1, #prefix) ~= prefix then break end
+    if n.path == target_path then return callback() end
+    if n.type == "directory" and not n:is_expanded()
+       and target_path:sub(1, #n.path + 1) == n.path .. "/" then
+      expand_directory(state, n, function()
+        expand_path_to(state, dir_line + offset, n.path, target_path, callback, depth + 1)
+      end)
+      return
+    end
+  end
+  callback()
+end
+
+--- Cerca un file per path nel tree, ritorna la riga o nil
+local function find_node_line(state, win, target_path)
+  local total = vim.api.nvim_buf_line_count(vim.api.nvim_win_get_buf(win))
+  for l = 1, total do
+    local n = state.tree:get_node(l)
+    if n and n.path == target_path then return l end
+  end
+  return nil
+end
+
+--- Navigazione asincrona: muovi cursore neo-tree al prossimo FILE.
+--- on_done(filepath) viene chiamato con il path del file trovato, o nil.
+local function navigate_neotree(delta, on_done)
   local state = cached_state
   if not state or not state.tree then
     nav_log("FAIL: no cached state")
-    return nil
+    return on_done(nil)
   end
 
   local win = find_neotree_win()
   if not win then
     nav_log("FAIL: no neo-tree window")
-    return nil
+    return on_done(nil)
   end
 
   nav_log("navigate delta=" .. delta .. " win=" .. win)
   local cmd = delta > 0 and "j" or "k"
 
-  for _ = 1, 100 do
+  local function step(remaining)
+    if remaining <= 0 then
+      nav_log("  exhausted")
+      return on_done(nil)
+    end
+
     local line = vim.api.nvim_win_get_cursor(win)[1]
     vim.api.nvim_win_call(win, function()
       vim.cmd("normal! " .. cmd)
@@ -226,17 +328,71 @@ local function navigate_neotree(delta)
     local new_line = vim.api.nvim_win_get_cursor(win)[1]
     if new_line == line then
       nav_log("  edge at line " .. line)
-      return nil
+      return on_done(nil)
     end
 
     local node = state.tree:get_node(new_line)
-    if node and node.type == "file" then
+    if not node then return on_done(nil) end
+
+    if node.type == "file" then
       nav_log("  -> " .. node.path)
-      return node.path
+      return on_done(node.path)
+    end
+
+    if node.type == "directory" then
+      if delta > 0 then
+        -- GIÙ: espandi cartella collassata, poi continua (prossimo j entra)
+        if not node:is_expanded() then
+          local target = fs_first_file(node.path)
+          if target then
+            expand_directory(state, node, function()
+              expand_path_to(state, new_line, node.path, target, function()
+                local tl = find_node_line(state, win, target)
+                if tl then
+                  vim.api.nvim_win_set_cursor(win, {tl, 0})
+                  nav_log("  -> " .. target)
+                  on_done(target)
+                else
+                  -- File non nel tree (gitignored?), continua navigazione
+                  step(remaining - 1)
+                end
+              end, 0)
+            end)
+            return
+          end
+        end
+        step(remaining - 1)
+      else
+        -- SU: salta directory espanse (genitori), espandi collassate
+        if node:is_expanded() then
+          step(remaining - 1)
+        else
+          local target = fs_last_file(node.path)
+          if not target then
+            nav_log("  no files in " .. node.path .. ", stopping")
+            return on_done(nil)
+          end
+          expand_directory(state, node, function()
+            expand_path_to(state, new_line, node.path, target, function()
+              local tl = find_node_line(state, win, target)
+              if tl then
+                vim.api.nvim_win_set_cursor(win, {tl, 0})
+                nav_log("  -> " .. target)
+                on_done(target)
+              else
+                nav_log("  target not in tree: " .. target)
+                on_done(nil)
+              end
+            end, 0)
+          end)
+        end
+      end
+    else
+      step(remaining - 1)
     end
   end
-  nav_log("  exhausted")
-  return nil
+
+  step(100)
 end
 
 --- Gestisci segnale di navigazione: "direzione\npath" o path diretto
@@ -251,19 +407,19 @@ local function handle_nav_signal(signal_file)
 
   if direction == "up" or direction == "down" then
     local delta = direction == "down" and 1 or -1
-    local filepath = navigate_neotree(delta)
-    if filepath then
-      nav_log("OK -> " .. filepath)
-      open_any_preview(filepath)
-      return true
-    end
-    if fallback_path and fallback_path:sub(1, 1) == "/" then
-      nav_log("FALLBACK -> " .. fallback_path)
-      reveal_in_neotree(fallback_path)
-      open_any_preview(fallback_path)
-      return true
-    end
-    nav_log("FAILED, no fallback")
+    navigate_neotree(delta, function(filepath)
+      if filepath then
+        nav_log("OK -> " .. filepath)
+        open_any_preview(filepath)
+      elseif fallback_path and fallback_path:sub(1, 1) == "/" then
+        nav_log("FALLBACK -> " .. fallback_path)
+        reveal_in_neotree(fallback_path)
+        open_any_preview(fallback_path)
+      else
+        nav_log("FAILED, no fallback")
+        reset_display()
+      end
+    end)
     return true
   end
 
