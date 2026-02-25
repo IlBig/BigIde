@@ -19,11 +19,16 @@ if ! git rev-parse --is-inside-work-tree &>/dev/null; then
   exit 0
 fi
 
-# Config BigIDE: Esc al livello root chiude lazygit
-LG_CONFIG="$HOME/.bigide/lazygit/config.yml"
-if [[ ! -f "$LG_CONFIG" ]]; then
-  mkdir -p "$(dirname "$LG_CONFIG")"
-  printf 'quitOnTopLevelReturn: true\n' > "$LG_CONFIG"
-fi
+# Config BigIDE: personalizzazioni lazygit
+LG_DIR="$HOME/.bigide/lazygit"
+LG_CONFIG="$LG_DIR/config.yml"
+mkdir -p "$LG_DIR"
+cat > "$LG_CONFIG" << 'YML'
+quitOnTopLevelReturn: true
+startuppopupversion: 5
+gui:
+  showBottomLine: false
+  showRandomTip: false
+YML
 
 exec lazygit --use-config-dir="$(dirname "$LG_CONFIG")"
