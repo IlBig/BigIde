@@ -29,6 +29,17 @@ Usage:
   bigide --repair
   bigide --update
   bigide --install-ccproxy
+  bigide --openai-login       # OAuth login OpenAI (apre browser)
+  bigide --openai-refresh     # Rinnova token OpenAI
+  bigide --openai-status      # Mostra stato token OpenAI
+  bigide --claude-login       # OAuth login Anthropic (apre browser)
+  bigide --claude-refresh     # Rinnova token Anthropic
+  bigide --claude-status      # Mostra stato token Anthropic
+  bigide --gemini-login       # OAuth login Google Gemini (apre browser)
+  bigide --gemini-refresh     # Rinnova token Gemini
+  bigide --gemini-status      # Mostra stato token Gemini
+  bigide --oauth-status       # Mostra stato tutti i provider
+  bigide --ccproxy-config     # Genera config ccproxy (~/.ccproxy/)
 TXT
 }
 
@@ -43,6 +54,61 @@ case "${1:-}" in
   --update)
     init_runtime
     update_bigide
+    exit 0
+    ;;
+  --install-ccproxy)
+    init_runtime
+    install_ccproxy
+    exit 0
+    ;;
+  --openai-login)
+    openai_oauth_login
+    exit $?
+    ;;
+  --openai-refresh)
+    openai_oauth_refresh
+    exit $?
+    ;;
+  --openai-status)
+    openai_oauth_status
+    exit $?
+    ;;
+  --claude-login)
+    claude_oauth_login
+    exit $?
+    ;;
+  --claude-refresh)
+    claude_oauth_refresh
+    exit $?
+    ;;
+  --claude-status)
+    claude_oauth_status
+    exit $?
+    ;;
+  --gemini-login)
+    gemini_oauth_login
+    exit $?
+    ;;
+  --gemini-refresh)
+    gemini_oauth_refresh
+    exit $?
+    ;;
+  --gemini-status)
+    gemini_oauth_status
+    exit $?
+    ;;
+  --oauth-status)
+    echo -e "\x1b[1m── Provider OAuth Status ──\x1b[0m"
+    echo
+    claude_oauth_status 2>/dev/null || echo "Anthropic: non configurato"
+    echo
+    openai_oauth_status 2>/dev/null || echo "OpenAI: non configurato"
+    echo
+    gemini_oauth_status 2>/dev/null || echo "Gemini: non configurato"
+    exit 0
+    ;;
+  --ccproxy-config)
+    generate_ccproxy_config
     exit 0
     ;;
   --layout)
