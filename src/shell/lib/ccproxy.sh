@@ -166,7 +166,14 @@ launch_claude_with_proxy() {
   local claude_flags="--dangerously-skip-permissions"
   [[ -n "$claude_extra" ]] && claude_flags="$claude_flags $claude_extra"
 
+  # Logga modello attivo
+  local active_model_file="$CCPROXY_CONFIG_DIR/active-model"
+  if [[ -f "$active_model_file" ]]; then
+    log "INFO" "Modello attivo: $(cat "$active_model_file")"
+  fi
+
   if [[ "$proxy_mode" == "disabled" ]]; then
+    log "INFO" "Avvio Claude diretto (proxy disabilitato)"
     exec claude $claude_flags
   fi
 
@@ -185,15 +192,20 @@ launch_claude_with_proxy() {
 
     # Tenta avvio con ccproxy
     if "$ccproxy_path" run --help >/dev/null 2>&1; then
+      log "INFO" "Avvio Claude via ccproxy (run mode)"
       exec "$ccproxy_path" run claude $claude_flags
     fi
 
     if "$ccproxy_path" start --help >/dev/null 2>&1; then
+      log "INFO" "Avvio ccproxy daemon + Claude"
       "$ccproxy_path" start >/dev/null 2>&1 || true
       exec claude $claude_flags
     fi
+
+    log "WARN" "ccproxy trovato ma non avviabile, fallback a Claude diretto"
+  else
+    log "INFO" "Avvio Claude diretto (ccproxy non installato)"
   fi
 
-  # ccproxy non installato: Claude diretto (silenzioso)
   exec claude $claude_flags
 }

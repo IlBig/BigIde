@@ -15,9 +15,11 @@ _R=$'\033[0m'
 mkdir -p "$(dirname "$BIGIDE_LOG")" "$(dirname "$CCPROXY_LOG")"
 touch "$BIGIDE_LOG" "$CCPROXY_LOG"
 
-echo "${_CYAN}BigIDE Logs${_R}  ${_DIM}(bigide + ccproxy)${_R}"
-echo "${_DIM}────────────────────────────────────${_R}"
-echo
+# Pulisci schermo completamente
+clear
 
-# tail -f su entrambi i file, merged
-exec tail -f "$BIGIDE_LOG" "$CCPROXY_LOG" 2>/dev/null
+printf "${_CYAN}BigIDE Logs${_R}  ${_DIM}(bigide + ccproxy)${_R}\n"
+printf "${_DIM}────────────────────────────────────${_R}\n\n"
+
+# tail -f -q: quiet mode (no "==> filename <==" headers)
+exec tail -n 20 -f -q "$BIGIDE_LOG" "$CCPROXY_LOG" 2>/dev/null
