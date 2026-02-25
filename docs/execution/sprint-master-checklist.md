@@ -21,9 +21,9 @@
 - [ ] Story 4.2: Scelta Layout Browser e Posizionamento Automatico (rimandata — limite Spaces macOS)
 
 ## Sprint 5 — Epic 5
-- [x] Story 5.1: Git Key Table e Branch Switch con Fuzzy Search
-- [x] Story 5.2: Commit, Push e Status in Popup
-- [x] Story 5.3: Lazygit Completo e Interazione Mouse
+- [x] Story 5.1: Git Branch Switch con Fuzzy Search (prefix + b)
+- ~~Story 5.2: rimossa — coperta da lazygit~~
+- [x] Story 5.3: Lazygit Completo e Interazione Mouse (prefix + g)
 
 ## Sprint 6 — Epic 6
 - [ ] Story 6.1: Verifica e Installazione Automatica Dipendenze

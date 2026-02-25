@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # BigIDE — Lazygit wrapper con check installazione
 # Chiamato da tmux popup (prefix + g g)
+# Esc al livello root chiude lazygit (quitOnTopLevelReturn)
 set -euo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
@@ -18,4 +19,11 @@ if ! git rev-parse --is-inside-work-tree &>/dev/null; then
   exit 0
 fi
 
-exec lazygit
+# Config BigIDE: Esc al livello root chiude lazygit
+LG_CONFIG="$HOME/.bigide/lazygit/config.yml"
+if [[ ! -f "$LG_CONFIG" ]]; then
+  mkdir -p "$(dirname "$LG_CONFIG")"
+  printf 'quitOnTopLevelReturn: true\n' > "$LG_CONFIG"
+fi
+
+exec lazygit --use-config-dir="$(dirname "$LG_CONFIG")"
