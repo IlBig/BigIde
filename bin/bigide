@@ -14,16 +14,25 @@ source "$REPO_ROOT/src/shell/lib/deps.sh"
 source "$REPO_ROOT/src/shell/lib/repair.sh"
 source "$REPO_ROOT/src/shell/lib/update.sh"
 source "$REPO_ROOT/src/shell/lib/ccproxy.sh"
+source "$REPO_ROOT/src/shell/lib/provision.sh"
+
+# Colori per output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
 
 usage() {
   cat <<'TXT'
 Usage:
-  bigide [project_path]
+  bigide [project_path] [--layout name]
   bigide --repair
   bigide --update
   bigide --install-ccproxy
 TXT
 }
+
+LAYOUT_NAME="default"
 
 case "${1:-}" in
   --repair)
@@ -36,38 +45,71 @@ case "${1:-}" in
     update_bigide
     exit 0
     ;;
-  --install-ccproxy)
-    init_runtime
-    if ensure_ccproxy; then
-      log "INFO" "ccproxy pronto: $(ccproxy_bin_path)"
-      exit 0
-    fi
-    die "Impossibile installare ccproxy automaticamente"
-    ;;
-  --help|-h)
-    usage
-    exit 0
+  --layout)
+    LAYOUT_NAME="${2:-default}"
+    shift 2
     ;;
 esac
 
-PROJECT_PATH="${1:-$PWD}"
+# Se lanciato dall'app senza argomento → mostra picker grafico
+if [[ -z "${1:-}" && "${BIGIDE_LAUNCHED_FROM_APP:-}" == "1" ]]; then
+  PROJECT_PATH="$(osascript -e 'POSIX path of (choose folder with prompt "Seleziona la cartella del progetto:")'  2>/dev/null)" || exit 0
+  PROJECT_PATH="${PROJECT_PATH%/}"  # rimuove trailing slash
+else
+  PROJECT_PATH="${1:-$PWD}"
+fi
+
 SESSION_NAME="$(session_name_for_path "$PROJECT_PATH")"
 
 show_splash "Verifica dipendenze" 10
-check_dependencies
+ensure_dependencies
 show_splash "Inizializzazione runtime" 35
 init_runtime
 
+# 1.5 Auto-provisioning
+check_auto_provision "$PROJECT_PATH"
+
 if session_exists "$SESSION_NAME"; then
-  show_splash "Aggancio sessione esistente" 80
   end_splash
-  exec tmux attach -t "$SESSION_NAME"
+  echo -e "\n${YELLOW}La sessione '$SESSION_NAME' esiste già.${NC}"
+  echo -e "Cosa vuoi fare?"
+  echo -e "  ${GREEN}[r] Riprendi${NC} (attach)"
+  echo -e "  ${RED}[k] Riavvia${NC} (kill & restart)"
+  echo -e "  [c] Annulla"
+  read -p "> " choice
+  
+  case "$choice" in
+    k|K)
+      show_splash "Chiusura sessione esistente" 70
+      tmux kill-session -t "$SESSION_NAME"
+      ;;
+    c|C)
+      exit 0
+      ;;
+    *)
+      show_splash "Aggancio sessione" 80
+      # Applica sempre le dimensioni aggiornate del layout, anche alla ripresa
+      apply_layout_resize "$SESSION_NAME" "$LAYOUT_NAME"
+      end_splash
+      if [ -n "${TMUX:-}" ]; then
+        exec tmux switch-client -t "$SESSION_NAME"
+      else
+        exec tmux attach -t "$SESSION_NAME"
+      fi
+      ;;
+  esac
 fi
 
 show_splash "Creazione nuova sessione" 60
 tmux new-session -d -s "$SESSION_NAME" -c "$PROJECT_PATH"
-show_splash "Creazione layout" 85
-create_layout "$SESSION_NAME"
+tmux source-file "$HOME/.bigide/tmux/tmux.conf" 2>/dev/null || true
+show_splash "Creazione layout: $LAYOUT_NAME" 85
+create_layout "$SESSION_NAME" "$LAYOUT_NAME"
 show_splash "Pronto" 100
 end_splash
-exec tmux attach -t "$SESSION_NAME"
+
+if [ -n "${TMUX:-}" ]; then
+  exec tmux switch-client -t "$SESSION_NAME"
+else
+  exec tmux attach -t "$SESSION_NAME"
+fi

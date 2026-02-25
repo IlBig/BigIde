@@ -1,7 +1,17 @@
 [manager]
 show_hidden = true
-ratio = [1, 3, 4]
+ratio = [0, 1, 1]
 
 [preview]
 max_width = 1200
 max_height = 1200
+
+[opener]
+edit = [
+	{ run = 'NVIM_APPNAME=bigide nvim "$@"', block = true, desc = "Edit in LazyVim" }
+]
+
+[open]
+rules = [
+	{ name = "*", use = "edit" }
+]

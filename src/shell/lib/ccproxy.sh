@@ -68,29 +68,31 @@ launch_claude_with_proxy() {
 
   proxy_mode="$(jq -r '.ccproxy.mode // "auto"' "$BIGIDE_HOME/config.json" 2>/dev/null || echo auto)"
 
+  local claude_flags="--dangerously-skip-permissions"
+
   if [[ "$proxy_mode" == "disabled" ]]; then
-    exec claude
+    exec claude $claude_flags
   fi
 
-  if ensure_ccproxy; then
+  # In modalità auto: usa ccproxy solo se già installato, senza tentare install
+  # Per installare ccproxy usa: bigide --install-ccproxy
+  if ccproxy_bin_path >/dev/null 2>&1; then
     ccproxy_path="$(ccproxy_bin_path)"
 
     if "$ccproxy_path" --help 2>&1 | grep -q " claude"; then
-      exec "$ccproxy_path" claude
+      exec "$ccproxy_path" claude $claude_flags
     fi
 
     if "$ccproxy_path" run --help >/dev/null 2>&1; then
-      exec "$ccproxy_path" run claude
+      exec "$ccproxy_path" run claude $claude_flags
     fi
 
     if "$ccproxy_path" start --help >/dev/null 2>&1; then
       "$ccproxy_path" start >/dev/null 2>&1 || true
-      exec claude
+      exec claude $claude_flags
     fi
-
-    log "WARN" "ccproxy trovato ma interfaccia non riconosciuta, uso Claude diretto"
-    exec claude
   fi
 
-  exec claude
+  # ccproxy non installato o non riconosciuto: Claude diretto (silenzioso)
+  exec claude $claude_flags
 }

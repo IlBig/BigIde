@@ -1,0 +1,41 @@
+# BigIDE — Configurazione Ghostty dedicata
+# Gestita automaticamente da BigIDE. Non modificare manualmente.
+# Per personalizzazioni locali crea: ~/.bigide/ghostty/config.local
+
+# ─── Font ────────────────────────────────────────────────────────────────────
+font-family = JetBrainsMono Nerd Font
+font-size = 14
+# Larghezza glifi: legacy (wcswidth) allinea Ghostty a tmux/nvim → no corruzione display
+grapheme-width-method = legacy
+
+# ─── Sfondo ──────────────────────────────────────────────────────────────────
+# Tokyo Night Storm — allineato al tema neovim (#1e2030)
+background = #1e2030
+background-opacity = 0.75
+background-blur-radius = 15
+
+# ─── Finestra ────────────────────────────────────────────────────────────────
+title = BigIDE
+confirm-close-surface = false
+fullscreen = true
+macos-non-native-fullscreen = true
+window-save-state = never
+# Padding zero: elimina spazio interno Ghostty che si somma ai bordi tmux
+window-padding-x = 0
+window-padding-y = 0
+
+# ─── Shortcut pannelli (Cmd+1..5 → prefix+N → select-pane) ──────────────────
+# Cmd+1: file | Cmd+2: claude | Cmd+3: terminale | Cmd+4: git | Cmd+5: log
+keybind = super+one=text:\x011
+keybind = super+two=text:\x012
+keybind = super+three=text:\x013
+keybind = super+four=text:\x014
+keybind = super+five=text:\x015
+
+# ─── Shell integration ────────────────────────────────────────────────────────
+shell-integration = detect
+shell-integration-features = cursor,title,sudo
+
+# ─── Comando avvio ───────────────────────────────────────────────────────────
+# Lancia direttamente BigIDE (tmux + layout) invece della shell di default
+command = /bin/zsh -l -c "exec $HOME/.bigide/scripts/bigide-inner.sh"

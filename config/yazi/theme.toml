@@ -1,0 +1,92 @@
+[icon]
+
+prepend_dirs = [
+  { name = ".git",         text = "",  fg = "#f14e32" },
+  { name = ".github",      text = "",  fg = "#ffffff" },
+  { name = ".claude",      text = "󰧑", fg = "#d4a017" },
+  { name = ".bmad",        text = "󰋩", fg = "#83a598" },
+  { name = "node_modules", text = "󰎙", fg = "#e8274b" },
+  { name = "src",          text = "󰴉", fg = "#519aba" },
+  { name = "docs",         text = "󰈙", fg = "#7ebae4" },
+  { name = "config",       text = "󰒓", fg = "#a074c4" },
+  { name = "bin",          text = "󰣖", fg = "#ebdbb2" },
+  { name = "dist",         text = "󰉋", fg = "#d79921" },
+  { name = "lib",          text = "󰲲", fg = "#a074c4" },
+  { name = "scripts",      text = "󱆃", fg = "#98971a" },
+  { name = "test",         text = "󰙨", fg = "#a9b665" },
+  { name = "tests",        text = "󰙨", fg = "#a9b665" },
+]
+
+prepend_files = [
+  { name = ".gitignore",     text = "",  fg = "#4d5a5e" },
+  { name = ".gitattributes", text = "",  fg = "#4d5a5e" },
+  { name = "Makefile",       text = "󱁤", fg = "#6d8086" },
+  { name = "Dockerfile",     text = "󰡨", fg = "#0db7ed" },
+  { name = "README.md",      text = "󰍔", fg = "#519aba" },
+  { name = "package.json",   text = "󰎙", fg = "#e8274b" },
+  { name = "package-lock.json", text = "󰎙", fg = "#4d5a5e" },
+  { name = "tsconfig.json",  text = "󰛦", fg = "#3178c6" },
+  { name = ".env",           text = "󰙩", fg = "#4d5a5e" },
+  { name = ".env.local",     text = "󰙩", fg = "#4d5a5e" },
+  { name = "setup.sh",       text = "󱆃", fg = "#98971a" },
+  { name = "CLAUDE.md",      text = "󰧑", fg = "#d4a017" },
+]
+
+prepend_exts = [
+  # Shell
+  { name = "sh",   text = "󱆃", fg = "#4d5a5e" },
+  { name = "bash", text = "󱆃", fg = "#4d5a5e" },
+  { name = "zsh",  text = "󱆃", fg = "#4d5a5e" },
+  { name = "fish", text = "󱆃", fg = "#4d5a5e" },
+  # Python
+  { name = "py",   text = "󰌠", fg = "#3572a5" },
+  { name = "pyc",  text = "󰌠", fg = "#4d5a5e" },
+  # JavaScript / TypeScript
+  { name = "js",   text = "󰌞", fg = "#f1e05a" },
+  { name = "mjs",  text = "󰌞", fg = "#f1e05a" },
+  { name = "ts",   text = "󰛦", fg = "#3178c6" },
+  { name = "tsx",  text = "󰜈", fg = "#3178c6" },
+  { name = "jsx",  text = "󰜈", fg = "#f1e05a" },
+  { name = "d.ts", text = "󰛦", fg = "#4d5a5e" },
+  # Data
+  { name = "json", text = "󰘦", fg = "#cbcb41" },
+  { name = "yaml", text = "󰬼", fg = "#cb171e" },
+  { name = "yml",  text = "󰬼", fg = "#cb171e" },
+  { name = "toml", text = "󰬼", fg = "#9c4221" },
+  { name = "csv",  text = "󰈙", fg = "#a9b665" },
+  # Docs
+  { name = "md",   text = "󰍔", fg = "#519aba" },
+  { name = "mdx",  text = "󰍔", fg = "#519aba" },
+  { name = "txt",  text = "󰈙", fg = "#ebdbb2" },
+  { name = "pdf",  text = "󰈦", fg = "#b30b00" },
+  # Systems
+  { name = "rs",   text = "󱘗", fg = "#dea584" },
+  { name = "go",   text = "󰟓", fg = "#00acd7" },
+  { name = "c",    text = "", fg = "#555555" },
+  { name = "cpp",  text = "", fg = "#f34b7d" },
+  { name = "h",    text = "", fg = "#555555" },
+  # Web
+  { name = "html", text = "󰌝", fg = "#e34c26" },
+  { name = "css",  text = "󰌜", fg = "#563d7c" },
+  { name = "scss", text = "󰌜", fg = "#c6538c" },
+  # Config
+  { name = "lock", text = "󰌾", fg = "#bbbbbb" },
+  { name = "env",  text = "󰙩", fg = "#4d5a5e" },
+  { name = "conf", text = "󰒓", fg = "#a074c4" },
+  { name = "ini",  text = "󰒓", fg = "#a074c4" },
+  # Media
+  { name = "png",  text = "󰋯", fg = "#a074c4" },
+  { name = "jpg",  text = "󰋯", fg = "#a074c4" },
+  { name = "jpeg", text = "󰋯", fg = "#a074c4" },
+  { name = "gif",  text = "󰋯", fg = "#a074c4" },
+  { name = "webp", text = "󰋯", fg = "#a074c4" },
+  { name = "svg",  text = "󰜡", fg = "#ffb13b" },
+  { name = "mp3",  text = "󰎆", fg = "#00afff" },
+  { name = "mp4",  text = "󰎁", fg = "#fd971f" },
+  { name = "mov",  text = "󰎁", fg = "#fd971f" },
+  # Archives
+  { name = "zip",  text = "󰿺", fg = "#eba0ac" },
+  { name = "tar",  text = "󰿺", fg = "#eba0ac" },
+  { name = "gz",   text = "󰿺", fg = "#eba0ac" },
+  { name = "7z",   text = "󰿺", fg = "#eba0ac" },
+]
