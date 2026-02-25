@@ -168,10 +168,26 @@ async function login() {
   console.log('Dopo il login, Anthropic mostrera un codice di autorizzazione.');
   console.log();
 
-  const code = await prompt('Incolla il codice qui: ');
+  let rawInput = await prompt('Incolla il codice qui: ');
+
+  if (!rawInput) {
+    throw new Error('Nessun codice inserito');
+  }
+
+  // Pulisci input: rimuovi frammento URL (#...), spazi, e estrai code da URL se incollato intero
+  let code = rawInput.trim();
+  // Se l'utente ha incollato un URL intero, estrai il parametro code
+  if (code.startsWith('http')) {
+    try {
+      const url = new URL(code);
+      code = url.searchParams.get('code') ?? code;
+    } catch { /* non è un URL, usa come codice diretto */ }
+  }
+  // Rimuovi frammento URL (#...) che Safari può aggiungere
+  code = code.split('#')[0].trim();
 
   if (!code) {
-    throw new Error('Nessun codice inserito');
+    throw new Error('Nessun codice valido trovato nell\'input');
   }
 
   console.log();

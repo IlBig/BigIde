@@ -22,7 +22,8 @@ const CLIENT_ID     = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const AUTHORIZE_URL = 'https://auth.openai.com/oauth/authorize';
 const TOKEN_URL     = 'https://auth.openai.com/oauth/token';
 const CALLBACK_PORT = 1455;
-const REDIRECT_URI  = `http://localhost:${CALLBACK_PORT}/auth/callback`;
+// 127.0.0.1 invece di localhost: Safari converte localhost in HTTPS (HSTS)
+const REDIRECT_URI  = `http://127.0.0.1:${CALLBACK_PORT}/auth/callback`;
 const SCOPE         = 'openid profile email offline_access';
 const REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minuti
 const OAUTH_TIMEOUT_MS  = 10 * 60 * 1000; // 10 minuti

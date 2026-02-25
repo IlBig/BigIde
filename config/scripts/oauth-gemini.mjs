@@ -28,7 +28,8 @@ const TOKEN_URL          = 'https://oauth2.googleapis.com/token';
 const USERINFO_URL       = 'https://www.googleapis.com/oauth2/v1/userinfo?alt=json';
 const CODE_ASSIST_URL    = 'https://cloudcode-pa.googleapis.com';
 const CALLBACK_PORT      = 8085;
-const REDIRECT_URI       = `http://localhost:${CALLBACK_PORT}/oauth2callback`;
+// 127.0.0.1 invece di localhost: Safari converte localhost in HTTPS (HSTS)
+const REDIRECT_URI       = `http://127.0.0.1:${CALLBACK_PORT}/oauth2callback`;
 const SCOPES             = [
   'https://www.googleapis.com/auth/cloud-platform',
   'https://www.googleapis.com/auth/userinfo.email',
