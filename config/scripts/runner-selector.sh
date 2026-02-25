@@ -509,11 +509,12 @@ _apply_model() {
   echo "$model" > "$_active_model_file"
 
   # ── 2. Determina api_base per il modello selezionato ──
-  local api_base
+  # Nota: per gemini/ LiteLLM gestisce l'URL internamente (non serve api_base)
+  local api_base=""
   case "$provider" in
     anthropic) api_base="https://api.anthropic.com" ;;
     openai)    api_base="https://api.openai.com" ;;
-    google)    api_base="https://generativelanguage.googleapis.com" ;;
+    google)    api_base="" ;;  # LiteLLM usa il default per gemini/
     *)         api_base="https://api.anthropic.com" ;;
   esac
 
@@ -529,6 +530,7 @@ _apply_model() {
   cat > "$CCPROXY_DIR/ccproxy.yaml" << YAML
 ccproxy:
   debug: true
+  default_model_passthrough: false
   log_file: ${CCPROXY_DIR}/proxy.log
   oat_sources:${oat_lines}
   hooks:
@@ -570,9 +572,9 @@ YAML
       ;;
     google)
       think_model="gemini/gemini-2.5-pro"
-      think_base="https://generativelanguage.googleapis.com"
+      think_base=""
       background_model="gemini/gemini-2.5-flash"
-      background_base="https://generativelanguage.googleapis.com"
+      background_base=""
       ;;
     *)
       think_model="anthropic/claude-opus-4-5-20251101"
@@ -599,22 +601,23 @@ YAML
     \"${alias}\": \"default\""
   done
 
-  cat > "$CCPROXY_DIR/config.yaml" << YAML
-model_list:
-  - model_name: default
-    litellm_params:
-      model: ${model}
-      api_base: ${api_base}
+  # Helper: genera blocco litellm_params (con/senza api_base)
+  _litellm_block() {
+    local name="$1" m="$2" base="$3"
+    echo "  - model_name: $name"
+    echo "    litellm_params:"
+    echo "      model: $m"
+    [[ -n "$base" ]] && echo "      api_base: $base"
+  }
 
-  - model_name: think
-    litellm_params:
-      model: ${think_model}
-      api_base: ${think_base}
-
-  - model_name: background
-    litellm_params:
-      model: ${background_model}
-      api_base: ${background_base}
+  {
+    echo "model_list:"
+    _litellm_block "default"    "$model"            "$api_base"
+    echo
+    _litellm_block "think"      "$think_model"      "$think_base"
+    echo
+    _litellm_block "background" "$background_model"  "$background_base"
+    cat << YAML_TAIL
 
 litellm_settings:
   set_verbose: false
@@ -628,7 +631,8 @@ router_settings:
 
 general_settings:
   forward_client_headers_to_llm_api: true
-YAML
+YAML_TAIL
+  } > "$CCPROXY_DIR/config.yaml"
 
   # ── 5. Riavvio Claude Code con --resume ──
   _restart_claude_resume

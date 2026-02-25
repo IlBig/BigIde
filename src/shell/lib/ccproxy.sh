@@ -102,6 +102,7 @@ generate_ccproxy_config() {
   cat > "$CCPROXY_CONFIG_DIR/ccproxy.yaml" << 'YAML'
 ccproxy:
   debug: false
+  default_model_passthrough: false
   oat_sources:
     anthropic: "jq -r '.claudeAiOauth.accessToken' ~/.claude/.credentials.json"
     openai: "jq -r '.tokens.access_token' ~/.codex/auth.json"
@@ -174,6 +175,20 @@ YAML
 
 # ── Launch ──────────────────────────────────────────────────────────────────────
 
+_export_oauth_tokens() {
+  # Legge i token OAuth dai file e li esporta come env vars
+  # LiteLLM usa queste vars per autenticare le richieste ai provider
+  local token
+  token="$(jq -r '.claudeAiOauth.accessToken // empty' "$HOME/.claude/.credentials.json" 2>/dev/null)" || true
+  [[ -n "$token" ]] && export ANTHROPIC_API_KEY="$token"
+
+  token="$(jq -r '.tokens.access_token // empty' "$HOME/.codex/auth.json" 2>/dev/null)" || true
+  [[ -n "$token" ]] && export OPENAI_API_KEY="$token"
+
+  token="$(jq -r '.tokens.access_token // empty' "$HOME/.gemini/auth.json" 2>/dev/null)" || true
+  [[ -n "$token" ]] && export GEMINI_API_KEY="$token"
+}
+
 _wait_for_proxy() {
   local max_attempts="${1:-15}" attempt=0
   while (( attempt < max_attempts )); do
@@ -228,7 +243,11 @@ launch_claude_with_proxy() {
       # 1. Ferma eventuale istanza precedente
       _stop_proxy
 
-      # 2. Avvia proxy in background (daemon, -d = detach)
+      # 2. Esporta token OAuth come env vars per LiteLLM
+      #    (i SDK richiedono api_key all'init, prima che gli hook possano intervenire)
+      _export_oauth_tokens
+
+      # 3. Avvia proxy in background (daemon, -d = detach)
       log "INFO" "Avvio ccproxy daemon (start -d) — config: $CCPROXY_CONFIG_DIR"
       "$ccproxy_path" --config-dir "$CCPROXY_CONFIG_DIR" start -d 2>/dev/null || true
 
