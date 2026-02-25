@@ -61,51 +61,56 @@ fi
 
 SESSION_NAME="$(session_name_for_path "$PROJECT_PATH")"
 
-show_splash "Verifica dipendenze" 10
-ensure_dependencies
-show_splash "Inizializzazione runtime" 35
-init_runtime
+# ── Log directory (prima di init_runtime che definisce BIGIDE_HOME) ──
+_BIGIDE_LOG_DIR="${BIGIDE_HOME:-$HOME/.bigide}/logs"
+mkdir -p "$_BIGIDE_LOG_DIR"
+_BIGIDE_LOG="$_BIGIDE_LOG_DIR/bigide.log"
+printf '\n── BigIDE avvio %s ──\n' "$(date)" >> "$_BIGIDE_LOG"
 
-# 1.5 Auto-provisioning
-check_auto_provision "$PROJECT_PATH"
+# ── Splash screen ──
+init_splash
+
+show_splash "Verifica dipendenze" 10
+if ! ensure_dependencies >> "$_BIGIDE_LOG" 2>&1; then
+  end_splash
+  echo -e "${RED}Errore durante la verifica delle dipendenze.${NC}"
+  echo -e "Controlla il log: ${YELLOW}$_BIGIDE_LOG${NC}"
+  exit 1
+fi
+
+show_splash "Inizializzazione runtime" 35
+if ! init_runtime >> "$_BIGIDE_LOG" 2>&1; then
+  end_splash
+  echo -e "${RED}Errore durante l'inizializzazione del runtime.${NC}"
+  echo -e "Controlla il log: ${YELLOW}$_BIGIDE_LOG${NC}"
+  exit 1
+fi
+
+show_splash "Provisioning progetto" 60
+check_auto_provision "$PROJECT_PATH" >> "$_BIGIDE_LOG" 2>&1
 
 if session_exists "$SESSION_NAME"; then
   end_splash
-  echo -e "\n${YELLOW}La sessione '$SESSION_NAME' esiste già.${NC}"
-  echo -e "Cosa vuoi fare?"
-  echo -e "  ${GREEN}[r] Riprendi${NC} (attach)"
-  echo -e "  ${RED}[k] Riavvia${NC} (kill & restart)"
-  echo -e "  [c] Annulla"
-  read -p "> " choice
-  
-  case "$choice" in
-    k|K)
-      show_splash "Chiusura sessione esistente" 70
-      tmux kill-session -t "$SESSION_NAME"
-      ;;
-    c|C)
-      exit 0
-      ;;
-    *)
-      show_splash "Aggancio sessione" 80
-      # Applica sempre le dimensioni aggiornate del layout, anche alla ripresa
-      apply_layout_resize "$SESSION_NAME" "$LAYOUT_NAME"
-      end_splash
-      if [ -n "${TMUX:-}" ]; then
-        exec tmux switch-client -t "$SESSION_NAME"
-      else
-        exec tmux attach -t "$SESSION_NAME"
-      fi
-      ;;
-  esac
+  if show_session_dialog "$SESSION_NAME"; then
+    # "Nuova" → kill + restart
+    tmux kill-session -t "$SESSION_NAME"
+    init_splash
+  else
+    # "Continua" → attach
+    apply_layout_resize "$SESSION_NAME" "$LAYOUT_NAME" >> "$_BIGIDE_LOG" 2>&1
+    if [ -n "${TMUX:-}" ]; then
+      exec tmux switch-client -t "$SESSION_NAME"
+    else
+      exec tmux attach -t "$SESSION_NAME"
+    fi
+  fi
 fi
 
-show_splash "Creazione nuova sessione" 60
+show_splash "Creazione nuova sessione" 70
 tmux new-session -d -s "$SESSION_NAME" -c "$PROJECT_PATH"
-tmux source-file "$HOME/.bigide/tmux/tmux.conf" 2>/dev/null || true
+tmux source-file "$HOME/.bigide/tmux/tmux.conf" >> "$_BIGIDE_LOG" 2>&1 || true
 show_splash "Creazione layout: $LAYOUT_NAME" 85
-create_layout "$SESSION_NAME" "$LAYOUT_NAME"
-show_splash "Pronto" 100
+create_layout "$SESSION_NAME" "$LAYOUT_NAME" >> "$_BIGIDE_LOG" 2>&1
 end_splash
 
 if [ -n "${TMUX:-}" ]; then
