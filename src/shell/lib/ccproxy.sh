@@ -99,10 +99,12 @@ generate_ccproxy_config() {
   mkdir -p "$CCPROXY_CONFIG_DIR"
 
   # ccproxy.yaml — routing + credenziali OAuth
+  # default_model_passthrough: true → nomi modello di Claude Code passano direttamente
+  # e vengono risolti dai deployment Tier 2 nella model_list
   cat > "$CCPROXY_CONFIG_DIR/ccproxy.yaml" << 'YAML'
 ccproxy:
   debug: false
-  default_model_passthrough: false
+  default_model_passthrough: true
   oat_sources:
     anthropic: "jq -r '.claudeAiOauth.accessToken' ~/.claude/.credentials.json"
     openai: "jq -r '.tokens.access_token' ~/.codex/auth.json"
@@ -110,6 +112,7 @@ ccproxy:
   hooks:
     - ccproxy.hooks.rule_evaluator
     - ccproxy.hooks.model_router
+    - ccproxy.hooks.capture_headers
     - ccproxy.hooks.forward_oauth
   rules:
     - name: background
@@ -125,50 +128,86 @@ litellm:
   num_workers: 4
 YAML
 
-  # config.yaml — deployment modelli (default Anthropic)
-  # model_group_alias mappa i nomi modello di Claude Code → "default"
+  # config.yaml — architettura two-tier:
+  # Tier 1 (Route aliases): default/think/background → bare model names
+  #   Usati quando ccproxy rules matchano (ThinkingRule, MatchModelRule)
+  #   model_router riscrive data["model"] al valore di litellm_params.model
+  #   poi LiteLLM router lo risolve tramite Tier 2
+  # Tier 2 (Deployments): nomi modello → provider/model + api_base
+  #   Matchano sia i passthrough da Claude Code che i rewrite da Tier 1
   cat > "$CCPROXY_CONFIG_DIR/config.yaml" << 'YAML'
 model_list:
+  # ── Tier 1: Route aliases (ccproxy rules → bare model names) ──
   - model_name: default
+    litellm_params:
+      model: claude-sonnet-4-6-20250901
+  - model_name: think
+    litellm_params:
+      model: claude-opus-4-6-20250901
+  - model_name: background
+    litellm_params:
+      model: claude-haiku-4-5-20251001
+
+  # ── Tier 2: Deployments (passthrough + route targets → Anthropic) ──
+  - model_name: claude-sonnet-4-6-20250901
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6-20250901
+      api_base: https://api.anthropic.com
+  - model_name: claude-sonnet-4-6
+    litellm_params:
+      model: anthropic/claude-sonnet-4-6
+      api_base: https://api.anthropic.com
+  - model_name: claude-sonnet-4-5-20250929
     litellm_params:
       model: anthropic/claude-sonnet-4-5-20250929
       api_base: https://api.anthropic.com
-
-  - model_name: think
+  - model_name: claude-sonnet-4-5-20250514
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5-20250514
+      api_base: https://api.anthropic.com
+  - model_name: claude-opus-4-6-20250901
+    litellm_params:
+      model: anthropic/claude-opus-4-6-20250901
+      api_base: https://api.anthropic.com
+  - model_name: claude-opus-4-6
+    litellm_params:
+      model: anthropic/claude-opus-4-6
+      api_base: https://api.anthropic.com
+  - model_name: claude-opus-4-5-20251101
     litellm_params:
       model: anthropic/claude-opus-4-5-20251101
       api_base: https://api.anthropic.com
-
-  - model_name: background
+  - model_name: claude-opus-4-5-20250514
+    litellm_params:
+      model: anthropic/claude-opus-4-5-20250514
+      api_base: https://api.anthropic.com
+  - model_name: claude-haiku-4-5-20251001
     litellm_params:
       model: anthropic/claude-haiku-4-5-20251001
+      api_base: https://api.anthropic.com
+  - model_name: claude-3-5-sonnet-20241022
+    litellm_params:
+      model: anthropic/claude-3-5-sonnet-20241022
+      api_base: https://api.anthropic.com
+  - model_name: claude-sonnet-4-5-latest
+    litellm_params:
+      model: anthropic/claude-sonnet-4-5-latest
+      api_base: https://api.anthropic.com
+  - model_name: claude-opus-4-5-latest
+    litellm_params:
+      model: anthropic/claude-opus-4-5-latest
       api_base: https://api.anthropic.com
 
 litellm_settings:
   callbacks:
     - ccproxy.handler
 
-router_settings:
-  model_group_alias:
-    "claude-sonnet-4-5-20250514": "default"
-    "claude-sonnet-4-5-20250929": "default"
-    "claude-sonnet-4-6": "default"
-    "claude-sonnet-4-6-20250901": "default"
-    "claude-opus-4-5-20250514": "default"
-    "claude-opus-4-5-20251101": "default"
-    "claude-opus-4-6": "default"
-    "claude-opus-4-6-20250901": "default"
-    "claude-haiku-4-5-20251001": "default"
-    "claude-3-5-sonnet-20241022": "default"
-    "claude-sonnet-4-5-latest": "default"
-    "claude-opus-4-5-latest": "default"
-
 general_settings:
   forward_client_headers_to_llm_api: true
 YAML
 
   # Salva modello attivo di default
-  echo "anthropic/claude-sonnet-4-5-20250929" > "$CCPROXY_CONFIG_DIR/active-model"
+  echo "anthropic/claude-sonnet-4-6-20250901" > "$CCPROXY_CONFIG_DIR/active-model"
 
   log "INFO" "Configurazione ccproxy generata in $CCPROXY_CONFIG_DIR"
 }

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # BigIDE — Runner Selector: login provider + selezione modello AI
 # Chiamato da tmux popup (es. prefix + m)
-# Due fasi: 1) Configura Provider  2) Seleziona Modello
+# Due fasi: 1) Configura Provider  2) Seleziona Modello/Runner
 set -euo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 BIGIDE_HOME="${BIGIDE_HOME:-$HOME/.bigide}"
-CCPROXY_DIR="$HOME/.ccproxy"
+RUNNERS_DIR="$BIGIDE_HOME/runners"
 
 # ─── Auto-reload da repo ─────────────────────────────────────────────────────
 _REPO_ROOT="$(cat "$BIGIDE_HOME/.repo_root" 2>/dev/null)" || true
@@ -59,15 +59,14 @@ _provider_status() {
   fi
 }
 
-# ─── Modello attivo ──────────────────────────────────────────────────────────
-_active_model_file="$CCPROXY_DIR/active-model"
+# ─── Stato attivo (runner + modello) ──────────────────────────────────────────
 
-_get_active_model() {
-  if [[ -f "$_active_model_file" ]]; then
-    cat "$_active_model_file" 2>/dev/null
-  else
-    echo ""
-  fi
+_get_active_key() {
+  # Ritorna "runner:model" come chiave unica per confronto
+  local runner model
+  runner="$(cat "$BIGIDE_HOME/active-runner" 2>/dev/null)" || runner="anthropic"
+  model="$(cat "$BIGIDE_HOME/active-model" 2>/dev/null)" || model="sonnet"
+  echo "${runner}:${model}"
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -258,7 +257,7 @@ _phase1() {
             ;;
           3)  # Continua → Fase 2
             tput cnorm 2>/dev/null || true
-            _phase2 "$status_claude" "$status_openai" "$status_gemini"
+            _phase2 "$status_claude"
             return $?
             ;;
         esac
@@ -269,48 +268,64 @@ _phase1() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# FASE 2 — Seleziona Modello
+# FASE 2 — Seleziona Modello / Runner
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _phase2() {
   local st_claude="${1:-disconnected}"
-  local st_openai="${2:-disconnected}"
-  local st_gemini="${3:-disconnected}"
 
-  local active_model
-  active_model="$(_get_active_model)"
+  local active_key
+  active_key="$(_get_active_key)"
 
-  # Costruisci lista modelli: (tipo|display|model_id|provider)
-  # Tipi: "header" (non selezionabile) o "model" (selezionabile)
+  # Costruisci lista: (tipo|display|item_key|action_type)
+  #   item_key = "anthropic:<alias>" o "custom:<runner_name>"
+  #   action_type = "anthropic" o "custom"
   local items=()
 
+  # ── Modelli Anthropic (nativi, --model flag) ──
   if [[ "$st_claude" == "connected" ]]; then
     items+=("header|── Anthropic (Claude MAX) ────────────")
-    items+=("model|claude-sonnet-4-5-20250929|anthropic/claude-sonnet-4-5-20250929|anthropic")
-    items+=("model|claude-opus-4-5-20251101|anthropic/claude-opus-4-5-20251101|anthropic")
-    items+=("model|claude-haiku-4-5-20251001|anthropic/claude-haiku-4-5-20251001|anthropic")
+    items+=("model|Sonnet 4.6|anthropic:sonnet|anthropic")
+    items+=("model|Opus 4.6|anthropic:opus|anthropic")
+    items+=("model|Haiku 4.5|anthropic:haiku|anthropic")
+    items+=("model|OpusPlan (opus+sonnet)|anthropic:opusplan|anthropic")
   fi
 
-  if [[ "$st_openai" == "connected" ]]; then
-    items+=("header|── OpenAI (Codex) ──────────────────────")
-    items+=("model|o3|openai/o3|openai")
-    items+=("model|o4-mini|openai/o4-mini|openai")
-    items+=("model|gpt-4.1|openai/gpt-4.1|openai")
-    items+=("model|codex-mini-latest|openai/codex-mini-latest|openai")
+  # ── Runner custom (CLAUDE_CONFIG_DIR) ──
+  local has_custom=false
+  if [[ -d "$RUNNERS_DIR" ]]; then
+    for rdir in "$RUNNERS_DIR"/*/; do
+      [[ -f "${rdir}settings.json" ]] || continue
+      has_custom=true
+      local rname
+      rname="$(basename "$rdir")"
+      # Estrai modello dal settings.json per display
+      local rmodel
+      rmodel="$(jq -r '.env.ANTHROPIC_MODEL // "n/a"' "${rdir}settings.json" 2>/dev/null)" || rmodel="n/a"
+      items+=("model|${rname} (${rmodel})|custom:${rname}|custom")
+    done
   fi
 
-  if [[ "$st_gemini" == "connected" ]]; then
-    items+=("header|── Google (Gemini) ─────────────────────")
-    items+=("model|gemini-2.5-pro|gemini/gemini-2.5-pro|google")
-    items+=("model|gemini-2.5-flash|gemini/gemini-2.5-flash|google")
-    items+=("model|gemini-2.0-flash|gemini/gemini-2.0-flash|google")
+  if [[ "$has_custom" == true ]]; then
+    # Inserisci header custom prima dei runner custom
+    # Trova l'indice del primo runner custom e inserisci l'header
+    local new_items=()
+    local inserted=false
+    for entry in "${items[@]}"; do
+      if [[ "$inserted" == false && "$entry" == model*custom ]]; then
+        new_items+=("header|── Runner Custom ────────────────────")
+        inserted=true
+      fi
+      new_items+=("$entry")
+    done
+    items=("${new_items[@]}")
   fi
 
   items+=("header|────────────────────────────────────────")
   items+=("model|◂ Torna ai provider|_back|_back")
 
-  # Se nessun provider connesso, solo il pulsante "torna"
-  if [[ "$st_claude" != "connected" && "$st_openai" != "connected" && "$st_gemini" != "connected" ]]; then
+  # Se nessun provider e nessun runner custom
+  if [[ "$st_claude" != "connected" && "$has_custom" != true ]]; then
     items=()
     items+=("header|  Nessun provider connesso!")
     items+=("header|  Torna indietro e fai login.")
@@ -331,13 +346,13 @@ _phase2() {
   local n_sel=${#selectable[@]}
 
   # Pre-seleziona modello attivo
-  if [[ -n "$active_model" ]]; then
+  if [[ -n "$active_key" ]]; then
     for si in "${!selectable[@]}"; do
       local entry="${items[${selectable[$si]}]}"
       local rest="${entry#*|}"
       local tmp="${rest#*|}"
-      local mid="${tmp%%|*}"
-      if [[ "$mid" == "$active_model" ]]; then
+      local item_key="${tmp%%|*}"
+      if [[ "$item_key" == "$active_key" ]]; then
         sel_idx=$si
         break
       fi
@@ -398,11 +413,11 @@ _phase2() {
         # Model selezionabile
         local display="${rest%%|*}"
         local tmp2="${rest#*|}"
-        local model_id="${tmp2%%|*}"
+        local item_key="${tmp2%%|*}"
         local mark color active_mark=""
 
         # Segna modello attivo
-        if [[ -n "$active_model" && "$model_id" == "$active_model" ]]; then
+        if [[ -n "$active_key" && "$item_key" == "$active_key" ]]; then
           active_mark=" ${_C_GREEN}●${_C_RESET}"
         fi
 
@@ -414,7 +429,6 @@ _phase2() {
 
         local label="${mark}${display}"
         local label_len=${#label}
-        # Calcola spazio per il badge attivo (● = 3 bytes ma 1 colonna visiva, + spazio)
         local active_visual=0
         if [[ -n "$active_mark" ]]; then
           active_visual=2  # spazio + ●
@@ -474,19 +488,16 @@ _phase2() {
         local chosen_rest="${chosen_entry#*|}"
         local chosen_display="${chosen_rest%%|*}"
         local tmp="${chosen_rest#*|}"
-        local chosen_model="${tmp%%|*}"
-        local chosen_provider="${tmp#*|}"
+        local chosen_key="${tmp%%|*}"
+        local chosen_type="${tmp#*|}"
 
-        if [[ "$chosen_model" == "_back" ]]; then
-          # Torna a fase 1
+        if [[ "$chosen_key" == "_back" ]]; then
           tput cnorm 2>/dev/null || true
           _phase1
           return $?
         fi
 
-        # Applica modello e genera config ccproxy
-        _apply_model "$chosen_model" "$chosen_provider" "$chosen_display" \
-          "$st_claude" "$st_openai" "$st_gemini"
+        _apply_selection "$chosen_key" "$chosen_type" "$chosen_display"
         tput cnorm 2>/dev/null || true
         exit 0
         ;;
@@ -496,152 +507,35 @@ _phase2() {
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Applica modello selezionato — genera config ccproxy completa
+# Applica selezione — salva runner + modello e riavvia Claude
 # ═══════════════════════════════════════════════════════════════════════════════
 
-_apply_model() {
-  local model="$1" provider="$2" display="$3"
-  local st_claude="${4:-disconnected}" st_openai="${5:-disconnected}" st_gemini="${6:-disconnected}"
+_apply_selection() {
+  local item_key="$1" action_type="$2" display="$3"
 
-  mkdir -p "$CCPROXY_DIR"
+  mkdir -p "$BIGIDE_HOME"
 
-  # ── 1. Salva modello attivo ──
-  echo "$model" > "$_active_model_file"
+  if [[ "$action_type" == "anthropic" ]]; then
+    # item_key = "anthropic:<alias>" → es. "anthropic:sonnet"
+    local alias="${item_key#anthropic:}"
+    echo "anthropic" > "$BIGIDE_HOME/active-runner"
+    echo "$alias"    > "$BIGIDE_HOME/active-model"
+  else
+    # item_key = "custom:<runner_name>" → es. "custom:kimi"
+    local runner_name="${item_key#custom:}"
+    local rmodel
+    rmodel="$(jq -r '.env.ANTHROPIC_MODEL // "unknown"' "$RUNNERS_DIR/$runner_name/settings.json" 2>/dev/null)" || rmodel="unknown"
+    echo "$runner_name" > "$BIGIDE_HOME/active-runner"
+    echo "$rmodel"      > "$BIGIDE_HOME/active-model"
+  fi
 
-  # ── 2. Determina api_base per il modello selezionato ──
-  # Nota: per gemini/ LiteLLM gestisce l'URL internamente (non serve api_base)
-  local api_base=""
-  case "$provider" in
-    anthropic) api_base="https://api.anthropic.com" ;;
-    openai)    api_base="https://api.openai.com" ;;
-    google)    api_base="" ;;  # LiteLLM usa il default per gemini/
-    *)         api_base="https://api.anthropic.com" ;;
-  esac
-
-  # ── 3. Genera ccproxy.yaml (OAuth sources + hooks) ──
-  local oat_lines=""
-  [[ "$st_claude" == "connected" ]] && oat_lines="${oat_lines}
-    anthropic: \"jq -r '.claudeAiOauth.accessToken' ~/.claude/.credentials.json\""
-  [[ "$st_openai" == "connected" ]] && oat_lines="${oat_lines}
-    openai: \"jq -r '.tokens.access_token' ~/.codex/auth.json\""
-  [[ "$st_gemini" == "connected" ]] && oat_lines="${oat_lines}
-    google: \"jq -r '.tokens.access_token' ~/.gemini/auth.json\""
-
-  cat > "$CCPROXY_DIR/ccproxy.yaml" << YAML
-ccproxy:
-  debug: true
-  default_model_passthrough: false
-  log_file: ${CCPROXY_DIR}/proxy.log
-  oat_sources:${oat_lines}
-  hooks:
-    - ccproxy.hooks.rule_evaluator
-    - ccproxy.hooks.model_router
-    - ccproxy.hooks.forward_oauth
-  rules:
-    - name: background
-      rule: ccproxy.rules.MatchModelRule
-      params:
-        - model_name: claude-haiku-4-5-20251001
-    - name: think
-      rule: ccproxy.rules.ThinkingRule
-
-litellm:
-  host: 127.0.0.1
-  port: 4000
-  num_workers: 4
-YAML
-
-  # ── 4. Genera config.yaml (model routing) ──
-  # Modello "default" = quello scelto dall'utente
-  # Modello "think" = modello forte per ragionamento esteso
-  # Modello "background" = modello veloce per task di sfondo
-
-  local think_model think_base background_model background_base
-  case "$provider" in
-    anthropic)
-      think_model="anthropic/claude-opus-4-5-20251101"
-      think_base="https://api.anthropic.com"
-      background_model="anthropic/claude-haiku-4-5-20251001"
-      background_base="https://api.anthropic.com"
-      ;;
-    openai)
-      think_model="openai/o3"
-      think_base="https://api.openai.com"
-      background_model="openai/o4-mini"
-      background_base="https://api.openai.com"
-      ;;
-    google)
-      think_model="gemini/gemini-2.5-pro"
-      think_base=""
-      background_model="gemini/gemini-2.5-flash"
-      background_base=""
-      ;;
-    *)
-      think_model="anthropic/claude-opus-4-5-20251101"
-      think_base="https://api.anthropic.com"
-      background_model="anthropic/claude-haiku-4-5-20251001"
-      background_base="https://api.anthropic.com"
-      ;;
-  esac
-
-  # model_group_alias: mappa qualsiasi nome modello di Claude Code → "default"
-  # Claude Code invia il proprio model ID (es. claude-sonnet-4-6), il proxy lo redirige
-  local _CLAUDE_ALIASES=(
-    "claude-sonnet-4-5-20250514" "claude-sonnet-4-5-20250929"
-    "claude-sonnet-4-6" "claude-sonnet-4-6-20250901"
-    "claude-opus-4-5-20250514" "claude-opus-4-5-20251101"
-    "claude-opus-4-6" "claude-opus-4-6-20250901"
-    "claude-haiku-4-5-20251001"
-    "claude-3-5-sonnet-20241022" "claude-3-5-haiku-20241022"
-    "claude-sonnet-4-5-latest" "claude-opus-4-5-latest"
-  )
-  local alias_yaml=""
-  for alias in "${_CLAUDE_ALIASES[@]}"; do
-    alias_yaml="${alias_yaml}
-    \"${alias}\": \"default\""
-  done
-
-  # Helper: genera blocco litellm_params (con/senza api_base)
-  _litellm_block() {
-    local name="$1" m="$2" base="$3"
-    echo "  - model_name: $name"
-    echo "    litellm_params:"
-    echo "      model: $m"
-    [[ -n "$base" ]] && echo "      api_base: $base"
-  }
-
-  {
-    echo "model_list:"
-    _litellm_block "default"    "$model"            "$api_base"
-    echo
-    _litellm_block "think"      "$think_model"      "$think_base"
-    echo
-    _litellm_block "background" "$background_model"  "$background_base"
-    cat << YAML_TAIL
-
-litellm_settings:
-  set_verbose: false
-  json_logs: true
-  log_responses: true
-  callbacks:
-    - ccproxy.handler
-
-router_settings:
-  model_group_alias:${alias_yaml}
-
-general_settings:
-  forward_client_headers_to_llm_api: true
-YAML_TAIL
-  } > "$CCPROXY_DIR/config.yaml"
-
-  # ── 5. Riavvio Claude Code con --resume ──
+  # Riavvia Claude nel pane tmux
   _restart_claude_resume
 
-  # ── 6. Feedback visivo ──
+  # Feedback visivo
   printf '\033[2J\033[H'
   echo
-  echo "  ${_C_GREEN}✓${_C_RESET} Modello selezionato: ${_C_CYAN}${display}${_C_RESET}"
-  echo "    ${_C_DIM}(${model})${_C_RESET}"
+  echo "  ${_C_GREEN}✓${_C_RESET} Selezionato: ${_C_CYAN}${display}${_C_RESET}"
   echo
   echo "  ${_C_DIM}Claude Code si sta riavviando con --resume...${_C_RESET}"
   echo
@@ -653,12 +547,6 @@ YAML_TAIL
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _restart_claude_resume() {
-  # Riavvia ccproxy daemon con la nuova config
-  if command -v ccproxy >/dev/null 2>&1; then
-    ccproxy --config-dir "$CCPROXY_DIR" stop 2>/dev/null || true
-    # Il proxy verrà riavviato da launch-claude.sh
-  fi
-
   # Trova il pane di Claude tramite il marker @bigide_pane_type
   local claude_pane
   claude_pane=$(tmux list-panes -a -F '#{pane_id} #{@bigide_pane_type}' 2>/dev/null \
