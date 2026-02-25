@@ -528,7 +528,8 @@ _apply_model() {
 
   cat > "$CCPROXY_DIR/ccproxy.yaml" << YAML
 ccproxy:
-  debug: false
+  debug: true
+  log_file: ${CCPROXY_DIR}/proxy.log
   oat_sources:${oat_lines}
   hooks:
     - ccproxy.hooks.rule_evaluator
@@ -599,6 +600,9 @@ model_list:
       api_base: ${background_base}
 
 litellm_settings:
+  set_verbose: false
+  json_logs: true
+  log_responses: true
   callbacks:
     - ccproxy.handler
 

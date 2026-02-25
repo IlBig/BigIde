@@ -81,7 +81,7 @@ create_layout() {
   { sleep 5 && tmux resize-pane -t "${left_top_id}" -x 41 2>/dev/null && sleep 0.2 && tmux resize-pane -t "${left_top_id}" -x 40 2>/dev/null; } &
   tmux send-keys -t "$right_top_id"     'clear; $HOME/.bigide/scripts/launch-claude.sh' C-m
   tmux send-keys -t "$terminal_pane_id" 'clear; zsh' C-m
-  tmux send-keys -t "$logs_pane_id"     'clear; zsh' C-m
+  tmux send-keys -t "$logs_pane_id"     'clear; $HOME/.bigide/scripts/log-viewer.sh' C-m
   local project_path
   project_path="$(tmux display-message -p -t "${session_name}:0.0" '#{pane_current_path}')"
   tmux send-keys -t "$gitbar_pane" "while true; do bash \$HOME/.bigide/scripts/git-bar.sh '${project_path}' 2>/dev/null; sleep 2; done" C-m
