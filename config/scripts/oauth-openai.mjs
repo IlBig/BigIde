@@ -16,14 +16,15 @@ import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
 import { execSync } from 'node:child_process';
+import { createInterface } from 'node:readline';
 
 // ── Costanti OAuth OpenAI ──────────────────────────────────────────────────────
 const CLIENT_ID     = 'app_EMoamEEZ73f0CkXaXp7hrann';
 const AUTHORIZE_URL = 'https://auth.openai.com/oauth/authorize';
 const TOKEN_URL     = 'https://auth.openai.com/oauth/token';
 const CALLBACK_PORT = 1455;
-// 127.0.0.1 invece di localhost: Safari converte localhost in HTTPS (HSTS)
-const REDIRECT_URI  = `http://127.0.0.1:${CALLBACK_PORT}/auth/callback`;
+// localhost obbligatorio: il client_id OpenAI accetta solo localhost
+const REDIRECT_URI  = `http://localhost:${CALLBACK_PORT}/auth/callback`;
 const SCOPE         = 'openid profile email offline_access';
 const REFRESH_BUFFER_MS = 5 * 60 * 1000; // 5 minuti
 const OAUTH_TIMEOUT_MS  = 10 * 60 * 1000; // 10 minuti
@@ -171,11 +172,73 @@ p{font-size:14px}</style></head><body>
   <p>Errore OAuth: ${err.replace(/</g, '&lt;')}</p>
 </body></html>`;
 
+// ── Helpers browser ────────────────────────────────────────────────────────────
+
+// Safari ha HSTS su localhost (converte http→https). Prova Chrome/Firefox prima.
+function openBrowser(url) {
+  const browsers = [
+    'Google Chrome',
+    'Firefox',
+    'Brave Browser',
+    'Microsoft Edge',
+  ];
+  for (const app of browsers) {
+    try {
+      execSync(`open -a "${app}" "${url}"`, { stdio: 'ignore' });
+      return app;
+    } catch { /* non installato */ }
+  }
+  // Fallback: browser di default (potrebbe essere Safari con HSTS)
+  try {
+    execSync(`open "${url}"`, { stdio: 'ignore' });
+    return 'default';
+  } catch {
+    return null;
+  }
+}
+
+function prompt(question) {
+  const rl = createInterface({ input: process.stdin, output: process.stdout });
+  return new Promise((resolve) => {
+    rl.question(question, (answer) => {
+      rl.close();
+      resolve(answer.trim());
+    });
+  });
+}
+
+function extractCodeFromUrl(input, expectedState) {
+  const trimmed = input.trim();
+  try {
+    // Potrebbe essere l'URL completo di redirect
+    const url = new URL(trimmed.startsWith('http') ? trimmed : `http://dummy?${trimmed}`);
+    const code = url.searchParams.get('code');
+    const state = url.searchParams.get('state');
+    if (code && (!state || state === expectedState)) return code;
+  } catch { /* non è un URL */ }
+  return null;
+}
+
 // ── Flusso OAuth login ─────────────────────────────────────────────────────────
 function login() {
   return new Promise((resolve, reject) => {
     const pkce = generatePkce();
     const authorizeUrl = buildAuthorizeUrl(pkce);
+    let settled = false;
+
+    function finish(err, tokens) {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      try { server.close(); } catch {}
+      if (err) reject(err); else resolve(tokens);
+    }
+
+    async function handleCode(code) {
+      const tokens = await exchangeCode(code, pkce.verifier);
+      saveTokens(tokens);
+      finish(null, tokens);
+    }
 
     const server = http.createServer(async (req, res) => {
       const url = new URL(req.url ?? '/', 'http://localhost');
@@ -191,9 +254,7 @@ function login() {
 
       if (oauthError) {
         res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(ERROR_HTML(oauthError));
-        clearTimeout(timer);
-        server.close();
-        reject(new Error(oauthError));
+        finish(new Error(oauthError));
         return;
       }
 
@@ -203,39 +264,51 @@ function login() {
       }
 
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }).end(SUCCESS_HTML);
-      clearTimeout(timer);
-      server.close();
 
-      try {
-        const tokens = await exchangeCode(code, pkce.verifier);
-        saveTokens(tokens);
-        resolve(tokens);
-      } catch (e) {
-        reject(e);
-      }
+      try { await handleCode(code); } catch (e) { finish(e); }
     });
 
     const timer = setTimeout(() => {
-      server.close();
-      reject(new Error('Timeout: OAuth non completato entro 10 minuti'));
+      finish(new Error('Timeout: OAuth non completato entro 10 minuti'));
     }, OAUTH_TIMEOUT_MS);
 
     server.listen(CALLBACK_PORT, '127.0.0.1', () => {
       console.log(`\x1b[36mOpenAI OAuth PKCE\x1b[0m`);
-      console.log(`Server callback in ascolto su http://localhost:${CALLBACK_PORT}`);
+      console.log(`Server callback in ascolto su porta ${CALLBACK_PORT}`);
       console.log();
 
-      // Apri il browser
-      try {
-        execSync(`open "${authorizeUrl}"`, { stdio: 'ignore' });
+      const browser = openBrowser(authorizeUrl);
+      if (browser && browser !== 'default') {
+        console.log(`Browser aperto (${browser}). Completa il login su OpenAI...`);
+      } else if (browser === 'default') {
         console.log('Browser aperto. Completa il login su OpenAI...');
-      } catch {
+      } else {
         console.log('Apri questo URL nel browser:');
         console.log();
         console.log(`  ${authorizeUrl}`);
       }
+
       console.log();
-      console.log('In attesa del callback...');
+      console.log('In attesa del callback automatico...');
+      console.log();
+      console.log(`\x1b[33mSe il browser mostra errore HTTPS/connessione:`);
+      console.log(`copia l'URL dalla barra degli indirizzi e incollalo qui.\x1b[0m`);
+      console.log();
+
+      // Fallback manuale: accetta URL incollato da stdin
+      (async () => {
+        const input = await prompt('(oppure incolla URL qui): ');
+        if (settled) return;
+        if (!input) return;
+        const code = extractCodeFromUrl(input, pkce.state);
+        if (code) {
+          console.log();
+          console.log('Codice estratto dall\'URL. Scambio token...');
+          try { await handleCode(code); } catch (e) { finish(e); }
+        } else {
+          console.log('\x1b[31mURL non valido. Attendo callback...\x1b[0m');
+        }
+      })();
     });
   });
 }
