@@ -63,26 +63,12 @@ function prompt(question) {
   });
 }
 
-// Safari funziona per Claude (redirect a console.anthropic.com, non localhost),
-// ma per coerenza proviamo Chrome/Firefox prima.
 function openBrowser(url) {
-  const browsers = [
-    'Google Chrome',
-    'Firefox',
-    'Brave Browser',
-    'Microsoft Edge',
-  ];
-  for (const app of browsers) {
-    try {
-      execSync(`open -a "${app}" "${url}"`, { stdio: 'ignore' });
-      return app;
-    } catch { /* non installato */ }
-  }
   try {
     execSync(`open "${url}"`, { stdio: 'ignore' });
-    return 'default';
+    return true;
   } catch {
-    return null;
+    return false;
   }
 }
 
@@ -177,11 +163,8 @@ async function login() {
   console.log(`\x1b[35mAnthropic OAuth PKCE\x1b[0m`);
   console.log();
 
-  // Apri il browser (Chrome/Firefox preferiti)
-  const browser = openBrowser(authorizeUrl);
-  if (browser && browser !== 'default') {
-    console.log(`Browser aperto (${browser}). Completa il login su claude.ai...`);
-  } else if (browser === 'default') {
+  // Apri il browser
+  if (openBrowser(authorizeUrl)) {
     console.log('Browser aperto. Completa il login su claude.ai...');
   } else {
     console.log('Apri questo URL nel browser:');

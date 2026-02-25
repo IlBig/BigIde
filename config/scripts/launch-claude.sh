@@ -43,7 +43,7 @@ unset CLAUDECODE 2>/dev/null || true
 
 if command -v claude >/dev/null 2>&1; then
   clear
-  launch_claude_with_proxy
+  launch_claude_with_proxy "$@"
 else
   log "ERROR" "Claude Code non trovato in PATH. Installa con: npm install -g @anthropic-ai/claude-code"
   echo "Claude Code non trovato."

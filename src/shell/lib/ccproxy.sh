@@ -90,6 +90,12 @@ gemini_oauth_status()  { _run_oauth gemini status; }
 # ── Generazione config ccproxy ──────────────────────────────────────────────────
 
 generate_ccproxy_config() {
+  # Se config esiste già (generata dal runner-selector), non sovrascrivere
+  if [[ -f "$CCPROXY_CONFIG_DIR/config.yaml" && -f "$CCPROXY_CONFIG_DIR/ccproxy.yaml" ]]; then
+    log "INFO" "Configurazione ccproxy già presente in $CCPROXY_CONFIG_DIR"
+    return 0
+  fi
+
   mkdir -p "$CCPROXY_CONFIG_DIR"
 
   # ccproxy.yaml — routing + credenziali OAuth
@@ -139,9 +145,13 @@ model_list:
 litellm_settings:
   callbacks:
     - ccproxy.handler
+
 general_settings:
   forward_client_headers_to_llm_api: true
 YAML
+
+  # Salva modello attivo di default
+  echo "anthropic/claude-sonnet-4-5-20250929" > "$CCPROXY_CONFIG_DIR/active-model"
 
   log "INFO" "Configurazione ccproxy generata in $CCPROXY_CONFIG_DIR"
 }
@@ -149,10 +159,12 @@ YAML
 # ── Launch ──────────────────────────────────────────────────────────────────────
 
 launch_claude_with_proxy() {
+  local claude_extra="${*:-}"
   local proxy_mode
   proxy_mode="$(jq -r '.ccproxy.mode // "auto"' "$BIGIDE_HOME/config.json" 2>/dev/null || echo auto)"
 
   local claude_flags="--dangerously-skip-permissions"
+  [[ -n "$claude_extra" ]] && claude_flags="$claude_flags $claude_extra"
 
   if [[ "$proxy_mode" == "disabled" ]]; then
     exec claude $claude_flags

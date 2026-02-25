@@ -174,26 +174,12 @@ p{font-size:14px}</style></head><body>
 
 // ── Helpers browser ────────────────────────────────────────────────────────────
 
-// Safari ha HSTS su localhost (converte http→https). Prova Chrome/Firefox prima.
 function openBrowser(url) {
-  const browsers = [
-    'Google Chrome',
-    'Firefox',
-    'Brave Browser',
-    'Microsoft Edge',
-  ];
-  for (const app of browsers) {
-    try {
-      execSync(`open -a "${app}" "${url}"`, { stdio: 'ignore' });
-      return app;
-    } catch { /* non installato */ }
-  }
-  // Fallback: browser di default (potrebbe essere Safari con HSTS)
   try {
     execSync(`open "${url}"`, { stdio: 'ignore' });
-    return 'default';
+    return true;
   } catch {
-    return null;
+    return false;
   }
 }
 
@@ -277,10 +263,7 @@ function login() {
       console.log(`Server callback in ascolto su porta ${CALLBACK_PORT}`);
       console.log();
 
-      const browser = openBrowser(authorizeUrl);
-      if (browser && browser !== 'default') {
-        console.log(`Browser aperto (${browser}). Completa il login su OpenAI...`);
-      } else if (browser === 'default') {
+      if (openBrowser(authorizeUrl)) {
         console.log('Browser aperto. Completa il login su OpenAI...');
       } else {
         console.log('Apri questo URL nel browser:');
