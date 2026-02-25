@@ -175,18 +175,20 @@ YAML
 
 # ── Launch ──────────────────────────────────────────────────────────────────────
 
-_export_oauth_tokens() {
-  # Legge i token OAuth dai file e li esporta come env vars
-  # LiteLLM usa queste vars per autenticare le richieste ai provider
+_build_proxy_env() {
+  # Costruisce stringa env vars per il daemon ccproxy (NON esporta nel shell corrente
+  # per evitare conflitto con l'auth nativa di Claude Code)
+  _PROXY_ENV=()
   local token
+
   token="$(jq -r '.claudeAiOauth.accessToken // empty' "$HOME/.claude/.credentials.json" 2>/dev/null)" || true
-  [[ -n "$token" ]] && export ANTHROPIC_API_KEY="$token"
+  [[ -n "$token" ]] && _PROXY_ENV+=("ANTHROPIC_API_KEY=$token")
 
   token="$(jq -r '.tokens.access_token // empty' "$HOME/.codex/auth.json" 2>/dev/null)" || true
-  [[ -n "$token" ]] && export OPENAI_API_KEY="$token"
+  [[ -n "$token" ]] && _PROXY_ENV+=("OPENAI_API_KEY=$token")
 
   token="$(jq -r '.tokens.access_token // empty' "$HOME/.gemini/auth.json" 2>/dev/null)" || true
-  [[ -n "$token" ]] && export GEMINI_API_KEY="$token"
+  [[ -n "$token" ]] && _PROXY_ENV+=("GEMINI_API_KEY=$token")
 }
 
 _wait_for_proxy() {
@@ -243,21 +245,21 @@ launch_claude_with_proxy() {
       # 1. Ferma eventuale istanza precedente
       _stop_proxy
 
-      # 2. Esporta token OAuth come env vars per LiteLLM
-      #    (i SDK richiedono api_key all'init, prima che gli hook possano intervenire)
-      _export_oauth_tokens
+      # 2. Prepara token OAuth per il daemon (isolati dal shell corrente)
+      _build_proxy_env
 
-      # 3. Avvia proxy in background (daemon, -d = detach)
+      # 3. Avvia proxy in background con token come env vars del processo
       log "INFO" "Avvio ccproxy daemon (start -d) — config: $CCPROXY_CONFIG_DIR"
-      "$ccproxy_path" --config-dir "$CCPROXY_CONFIG_DIR" start -d 2>/dev/null || true
+      env "${_PROXY_ENV[@]}" "$ccproxy_path" --config-dir "$CCPROXY_CONFIG_DIR" start -d 2>/dev/null || true
 
-      # 3. Attendi che il proxy sia pronto (max 15s)
+      # 4. Attendi che il proxy sia pronto (max 15s)
       log "INFO" "Attesa proxy su 127.0.0.1:4000..."
       if _wait_for_proxy 15; then
         log "INFO" "Proxy pronto — avvio Claude via ccproxy run"
         # Cleanup proxy quando il pane viene chiuso
         trap '_stop_proxy' EXIT
-        # ccproxy run: imposta env vars (ANTHROPIC_BASE_URL etc.) + esegue comando
+        # ccproxy run: imposta ANTHROPIC_BASE_URL (punta al proxy) + esegue claude
+        # NON imposta ANTHROPIC_API_KEY (evita conflitto con auth nativa di Claude)
         exec "$ccproxy_path" --config-dir "$CCPROXY_CONFIG_DIR" run claude $claude_flags
       else
         log "WARN" "Proxy non pronto dopo 15s, fallback a Claude diretto"
