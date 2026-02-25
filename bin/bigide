@@ -13,7 +13,7 @@ source "$REPO_ROOT/src/shell/lib/layout.sh"
 source "$REPO_ROOT/src/shell/lib/deps.sh"
 source "$REPO_ROOT/src/shell/lib/repair.sh"
 source "$REPO_ROOT/src/shell/lib/update.sh"
-source "$REPO_ROOT/src/shell/lib/ccproxy.sh"
+source "$REPO_ROOT/src/shell/lib/runners.sh"
 source "$REPO_ROOT/src/shell/lib/provision.sh"
 
 # Colori per output
@@ -28,7 +28,6 @@ Usage:
   bigide [project_path] [--layout name]
   bigide --repair
   bigide --update
-  bigide --install-ccproxy
   bigide --openai-login       # OAuth login OpenAI (apre browser)
   bigide --openai-refresh     # Rinnova token OpenAI
   bigide --openai-status      # Mostra stato token OpenAI
@@ -39,7 +38,6 @@ Usage:
   bigide --gemini-refresh     # Rinnova token Gemini
   bigide --gemini-status      # Mostra stato token Gemini
   bigide --oauth-status       # Mostra stato tutti i provider
-  bigide --ccproxy-config     # Genera config ccproxy (~/.ccproxy/)
 TXT
 }
 
@@ -54,11 +52,6 @@ case "${1:-}" in
   --update)
     init_runtime
     update_bigide
-    exit 0
-    ;;
-  --install-ccproxy)
-    init_runtime
-    install_ccproxy
     exit 0
     ;;
   --openai-login)
@@ -105,10 +98,6 @@ case "${1:-}" in
     openai_oauth_status 2>/dev/null || echo "OpenAI: non configurato"
     echo
     gemini_oauth_status 2>/dev/null || echo "Gemini: non configurato"
-    exit 0
-    ;;
-  --ccproxy-config)
-    generate_ccproxy_config
     exit 0
     ;;
   --layout)

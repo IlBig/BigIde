@@ -106,19 +106,6 @@ _ensure_pip_deps() {
   fi
 }
 
-_ensure_ccproxy() {
-  _check_cmd ccproxy && return
-  log "INFO" "Installazione ccproxy (proxy multi-provider per Claude Code)..."
-  # uv tool install con Python 3.13 dedicato (isolato dal sistema):
-  # - uvloop non è compatibile con Python 3.14+
-  # - uv scarica e gestisce Python 3.13 automaticamente in ~/.local/share/uv/python/
-  # - non inquina il Python di sistema
-  if _check_cmd uv; then
-    uv tool install --python 3.13 claude-ccproxy --with 'litellm[proxy]' 2>/dev/null && return
-  fi
-  log "WARN" "Impossibile installare ccproxy. Serve uv con Python 3.13."
-}
-
 # ── Entry point principale ────────────────────────────────────────────────────
 
 ensure_dependencies() {
@@ -131,7 +118,6 @@ ensure_dependencies() {
   _ensure_uv
   _ensure_mcp_build
   _ensure_pip_deps
-  _ensure_ccproxy
   # LazyVim plugins installati da init_runtime() dopo copia config
 }
 

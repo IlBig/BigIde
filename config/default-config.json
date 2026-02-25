@@ -12,9 +12,8 @@
     "defaultCaptureLines": 50,
     "waitTimeoutMs": 5000
   },
-  "ccproxy": {
-    "mode": "auto",
-    "transparent": true,
-    "repo": "https://github.com/starbased-co/ccproxy"
+  "runner": {
+    "default": "anthropic",
+    "model": "sonnet"
   }
 }
