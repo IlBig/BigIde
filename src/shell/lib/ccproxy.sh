@@ -125,6 +125,7 @@ litellm:
 YAML
 
   # config.yaml — deployment modelli (default Anthropic)
+  # model_group_alias mappa i nomi modello di Claude Code → "default"
   cat > "$CCPROXY_CONFIG_DIR/config.yaml" << 'YAML'
 model_list:
   - model_name: default
@@ -146,6 +147,21 @@ litellm_settings:
   callbacks:
     - ccproxy.handler
 
+router_settings:
+  model_group_alias:
+    "claude-sonnet-4-5-20250514": "default"
+    "claude-sonnet-4-5-20250929": "default"
+    "claude-sonnet-4-6": "default"
+    "claude-sonnet-4-6-20250901": "default"
+    "claude-opus-4-5-20250514": "default"
+    "claude-opus-4-5-20251101": "default"
+    "claude-opus-4-6": "default"
+    "claude-opus-4-6-20250901": "default"
+    "claude-haiku-4-5-20251001": "default"
+    "claude-3-5-sonnet-20241022": "default"
+    "claude-sonnet-4-5-latest": "default"
+    "claude-opus-4-5-latest": "default"
+
 general_settings:
   forward_client_headers_to_llm_api: true
 YAML
@@ -157,6 +173,24 @@ YAML
 }
 
 # ── Launch ──────────────────────────────────────────────────────────────────────
+
+_wait_for_proxy() {
+  local max_attempts="${1:-15}" attempt=0
+  while (( attempt < max_attempts )); do
+    if curl -s -o /dev/null -w '' "http://127.0.0.1:4000/health" 2>/dev/null; then
+      return 0
+    fi
+    (( attempt++ ))
+    sleep 1
+  done
+  return 1
+}
+
+_stop_proxy() {
+  local ccproxy_path
+  ccproxy_path="$(ccproxy_bin_path 2>/dev/null)" || return 0
+  "$ccproxy_path" --config-dir "$CCPROXY_CONFIG_DIR" stop 2>/dev/null || true
+}
 
 launch_claude_with_proxy() {
   local claude_extra="${*:-}"
@@ -190,11 +224,26 @@ launch_claude_with_proxy() {
     openai_oauth_ensure 2>/dev/null || true
     gemini_oauth_ensure 2>/dev/null || true
 
-    # ccproxy run: avvia proxy + imposta env vars + esegue comando
-    # Sintassi: ccproxy --config-dir DIR run COMMAND [ARGS...]
     if [[ -d "$CCPROXY_CONFIG_DIR" ]]; then
-      log "INFO" "Avvio Claude via ccproxy (run mode) — config: $CCPROXY_CONFIG_DIR"
-      exec "$ccproxy_path" --config-dir "$CCPROXY_CONFIG_DIR" run claude $claude_flags
+      # 1. Ferma eventuale istanza precedente
+      _stop_proxy
+
+      # 2. Avvia proxy in background (daemon, -d = detach)
+      log "INFO" "Avvio ccproxy daemon (start -d) — config: $CCPROXY_CONFIG_DIR"
+      "$ccproxy_path" --config-dir "$CCPROXY_CONFIG_DIR" start -d 2>/dev/null || true
+
+      # 3. Attendi che il proxy sia pronto (max 15s)
+      log "INFO" "Attesa proxy su 127.0.0.1:4000..."
+      if _wait_for_proxy 15; then
+        log "INFO" "Proxy pronto — avvio Claude via ccproxy run"
+        # Cleanup proxy quando il pane viene chiuso
+        trap '_stop_proxy' EXIT
+        # ccproxy run: imposta env vars (ANTHROPIC_BASE_URL etc.) + esegue comando
+        exec "$ccproxy_path" --config-dir "$CCPROXY_CONFIG_DIR" run claude $claude_flags
+      else
+        log "WARN" "Proxy non pronto dopo 15s, fallback a Claude diretto"
+        _stop_proxy
+      fi
     fi
 
     log "WARN" "ccproxy trovato ma config mancante, fallback a Claude diretto"

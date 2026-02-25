@@ -301,9 +301,9 @@ _phase2() {
 
   if [[ "$st_gemini" == "connected" ]]; then
     items+=("header|── Google (Gemini) ─────────────────────")
-    items+=("model|gemini-2.5-pro|vertex_ai/gemini-2.5-pro|google")
-    items+=("model|gemini-2.5-flash|vertex_ai/gemini-2.5-flash|google")
-    items+=("model|gemini-2.0-flash|vertex_ai/gemini-2.0-flash|google")
+    items+=("model|gemini-2.5-pro|gemini/gemini-2.5-pro|google")
+    items+=("model|gemini-2.5-flash|gemini/gemini-2.5-flash|google")
+    items+=("model|gemini-2.0-flash|gemini/gemini-2.0-flash|google")
   fi
 
   items+=("header|────────────────────────────────────────")
@@ -569,9 +569,9 @@ YAML
       background_base="https://api.openai.com"
       ;;
     google)
-      think_model="vertex_ai/gemini-2.5-pro"
+      think_model="gemini/gemini-2.5-pro"
       think_base="https://generativelanguage.googleapis.com"
-      background_model="vertex_ai/gemini-2.5-flash"
+      background_model="gemini/gemini-2.5-flash"
       background_base="https://generativelanguage.googleapis.com"
       ;;
     *)
@@ -581,6 +581,23 @@ YAML
       background_base="https://api.anthropic.com"
       ;;
   esac
+
+  # model_group_alias: mappa qualsiasi nome modello di Claude Code → "default"
+  # Claude Code invia il proprio model ID (es. claude-sonnet-4-6), il proxy lo redirige
+  local _CLAUDE_ALIASES=(
+    "claude-sonnet-4-5-20250514" "claude-sonnet-4-5-20250929"
+    "claude-sonnet-4-6" "claude-sonnet-4-6-20250901"
+    "claude-opus-4-5-20250514" "claude-opus-4-5-20251101"
+    "claude-opus-4-6" "claude-opus-4-6-20250901"
+    "claude-haiku-4-5-20251001"
+    "claude-3-5-sonnet-20241022" "claude-3-5-haiku-20241022"
+    "claude-sonnet-4-5-latest" "claude-opus-4-5-latest"
+  )
+  local alias_yaml=""
+  for alias in "${_CLAUDE_ALIASES[@]}"; do
+    alias_yaml="${alias_yaml}
+    \"${alias}\": \"default\""
+  done
 
   cat > "$CCPROXY_DIR/config.yaml" << YAML
 model_list:
@@ -606,6 +623,9 @@ litellm_settings:
   callbacks:
     - ccproxy.handler
 
+router_settings:
+  model_group_alias:${alias_yaml}
+
 general_settings:
   forward_client_headers_to_llm_api: true
 YAML
@@ -629,6 +649,12 @@ YAML
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _restart_claude_resume() {
+  # Riavvia ccproxy daemon con la nuova config
+  if command -v ccproxy >/dev/null 2>&1; then
+    ccproxy --config-dir "$CCPROXY_DIR" stop 2>/dev/null || true
+    # Il proxy verrà riavviato da launch-claude.sh
+  fi
+
   # Trova il pane di Claude tramite il marker @bigide_pane_type
   local claude_pane
   claude_pane=$(tmux list-panes -a -F '#{pane_id} #{@bigide_pane_type}' 2>/dev/null \
