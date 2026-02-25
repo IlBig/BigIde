@@ -33,5 +33,11 @@ selected=$(git for-each-ref --format='%(refname:short)' refs/heads | \
 if [[ -n "$selected" && "$selected" != "$CURRENT" ]]; then
   git checkout "$selected" 2>&1
   printf '\n\033[38;2;158;206;106m  ✔ Passato a: %s\033[0m\n' "$selected"
-  sleep 1
+  # Refresh neo-tree nel pane filetree (pane con @bigide_pane_type=yazi)
+  TREE_PANE="$(tmux list-panes -F '#{pane_id} #{@bigide_pane_type}' 2>/dev/null | awk '$2=="yazi"{print $1}')"
+  if [[ -n "$TREE_PANE" ]]; then
+    tmux send-keys -t "$TREE_PANE" Escape
+    tmux send-keys -t "$TREE_PANE" ":Neotree action=focus reveal=true" Enter
+  fi
+  sleep 0.5
 fi
