@@ -79,8 +79,8 @@ init_splash() {
   local col=$(( (_SP_TERM_W - box_total) / 2 ))
   (( col < 1 )) && col=1 || true
 
-  # Centra verticalmente (box = 16 righe)
-  local box_h=16
+  # Centra verticalmente (box = 17 righe)
+  local box_h=17
   _SP_TOP_ROW=$(( (_SP_TERM_H - box_h) / 2 ))
   (( _SP_TOP_ROW < 1 )) && _SP_TOP_ROW=1 || true
 
@@ -158,6 +158,11 @@ init_splash() {
   _sp_frame_row "$r" "$col"
   (( r++ ))
 
+  # ── Riga percentuale (segnaposto) ──
+  export _SP_PCT_ROW=$r
+  _sp_frame_row "$r" "$col"
+  (( r++ ))
+
   # ── Riga step (segnaposto) ──
   export _SP_STEP_ROW=$r
   _sp_frame_row "$r" "$col"
@@ -192,11 +197,10 @@ show_splash() {
   local empty=$(( _SP_BAR_LEN - filled ))
 
   local pct_str
-  pct_str=$(printf '%3d%%' "$pct")
+  pct_str=$(printf '%d%%' "$pct")
 
-  # Centra la barra: 30 blocchi + 2 spazi + 4 pct = 36
-  local bar_total=$(( _SP_BAR_LEN + 2 + 4 ))
-  local bar_pad=$(( (_SP_BOX_W - bar_total) / 2 ))
+  # Centra la barra (solo blocchi, senza percentuale)
+  local bar_pad=$(( (_SP_BOX_W - _SP_BAR_LEN) / 2 ))
 
   # ── Aggiorna riga barra ──
   _sp_frame_row "${_SP_BAR_ROW:-12}" "$col"
@@ -209,10 +213,16 @@ show_splash() {
     printf '%s' "$_SP_DIM"
     printf '░%.0s' $(seq 1 "$empty")
   fi
-  printf '%s  %s%s%s' "$_SP_RESET" "$_SP_WHITE" "$pct_str" "$_SP_RESET"
+  printf '%s' "$_SP_RESET"
+
+  # ── Aggiorna riga percentuale ──
+  _sp_frame_row "${_SP_PCT_ROW:-13}" "$col"
+  local pct_pad=$(( (_SP_BOX_W - ${#pct_str}) / 2 ))
+  _sp_goto "${_SP_PCT_ROW:-13}" "$(( col + 1 + pct_pad ))"
+  printf '%s%s%s' "$_SP_WHITE" "$pct_str" "$_SP_RESET"
 
   # ── Aggiorna riga step ──
-  _sp_frame_row "${_SP_STEP_ROW:-13}" "$col"
+  _sp_frame_row "${_SP_STEP_ROW:-14}" "$col"
   local step_display="▸ ${step_text}"
   local max_len=$(( _SP_BOX_W - 2 ))
   if (( ${#step_display} > max_len )); then
