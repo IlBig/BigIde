@@ -177,7 +177,7 @@ launch_claude_with_proxy() {
     exec claude $claude_flags
   fi
 
-  # In modalità auto: usa ccproxy solo se già installato
+  # In modalità auto: usa ccproxy solo se già installato e configurato
   if ccproxy_bin_path >/dev/null 2>&1; then
     local ccproxy_path
     ccproxy_path="$(ccproxy_bin_path)"
@@ -190,19 +190,14 @@ launch_claude_with_proxy() {
     openai_oauth_ensure 2>/dev/null || true
     gemini_oauth_ensure 2>/dev/null || true
 
-    # Tenta avvio con ccproxy
-    if "$ccproxy_path" run --help >/dev/null 2>&1; then
-      log "INFO" "Avvio Claude via ccproxy (run mode)"
-      exec "$ccproxy_path" run claude $claude_flags
+    # ccproxy run: avvia proxy + imposta env vars + esegue comando
+    # Sintassi: ccproxy --config-dir DIR run COMMAND [ARGS...]
+    if [[ -d "$CCPROXY_CONFIG_DIR" ]]; then
+      log "INFO" "Avvio Claude via ccproxy (run mode) — config: $CCPROXY_CONFIG_DIR"
+      exec "$ccproxy_path" --config-dir "$CCPROXY_CONFIG_DIR" run claude $claude_flags
     fi
 
-    if "$ccproxy_path" start --help >/dev/null 2>&1; then
-      log "INFO" "Avvio ccproxy daemon + Claude"
-      "$ccproxy_path" start >/dev/null 2>&1 || true
-      exec claude $claude_flags
-    fi
-
-    log "WARN" "ccproxy trovato ma non avviabile, fallback a Claude diretto"
+    log "WARN" "ccproxy trovato ma config mancante, fallback a Claude diretto"
   else
     log "INFO" "Avvio Claude diretto (ccproxy non installato)"
   fi
