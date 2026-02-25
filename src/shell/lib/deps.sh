@@ -106,6 +106,22 @@ _ensure_pip_deps() {
   fi
 }
 
+_ensure_ccproxy() {
+  _check_cmd ccproxy && return
+  log "INFO" "Installazione ccproxy (proxy multi-provider per Claude Code)..."
+  # uv è già installato da _ensure_uv()
+  if _check_cmd uv; then
+    uv tool install claude-ccproxy --with 'litellm[proxy]' 2>/dev/null && return
+  fi
+  if _check_cmd pipx; then
+    pipx install claude-ccproxy --pip-args='litellm[proxy]' 2>/dev/null && return
+  fi
+  if _check_cmd pip3; then
+    pip3 install --user -q claude-ccproxy 'litellm[proxy]' 2>/dev/null && return
+  fi
+  log "WARN" "Impossibile installare ccproxy. Installa manualmente: uv tool install claude-ccproxy --with 'litellm[proxy]'"
+}
+
 # ── Entry point principale ────────────────────────────────────────────────────
 
 ensure_dependencies() {
@@ -118,6 +134,7 @@ ensure_dependencies() {
   _ensure_uv
   _ensure_mcp_build
   _ensure_pip_deps
+  _ensure_ccproxy
   # LazyVim plugins installati da init_runtime() dopo copia config
 }
 
