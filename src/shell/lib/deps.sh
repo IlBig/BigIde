@@ -109,17 +109,14 @@ _ensure_pip_deps() {
 _ensure_ccproxy() {
   _check_cmd ccproxy && return
   log "INFO" "Installazione ccproxy (proxy multi-provider per Claude Code)..."
-  # uv è già installato da _ensure_uv()
+  # uv tool install con Python 3.13 dedicato (isolato dal sistema):
+  # - uvloop non è compatibile con Python 3.14+
+  # - uv scarica e gestisce Python 3.13 automaticamente in ~/.local/share/uv/python/
+  # - non inquina il Python di sistema
   if _check_cmd uv; then
-    uv tool install claude-ccproxy --with 'litellm[proxy]' 2>/dev/null && return
+    uv tool install --python 3.13 claude-ccproxy --with 'litellm[proxy]' 2>/dev/null && return
   fi
-  if _check_cmd pipx; then
-    pipx install claude-ccproxy --pip-args='litellm[proxy]' 2>/dev/null && return
-  fi
-  if _check_cmd pip3; then
-    pip3 install --user -q claude-ccproxy 'litellm[proxy]' 2>/dev/null && return
-  fi
-  log "WARN" "Impossibile installare ccproxy. Installa manualmente: uv tool install claude-ccproxy --with 'litellm[proxy]'"
+  log "WARN" "Impossibile installare ccproxy. Serve uv con Python 3.13."
 }
 
 # ── Entry point principale ────────────────────────────────────────────────────
