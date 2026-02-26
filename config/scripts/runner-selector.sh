@@ -161,23 +161,17 @@ _create_runner_config() {
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
   fi
 
-  # Merge: prende ~/.claude/settings.json come base, aggiunge env provider
-  local src_settings="$HOME/.claude/settings.json"
-  if [[ -f "$src_settings" ]] && command -v jq >/dev/null 2>&1; then
-    jq --arg url "$base_url" --arg key "$token" --arg mdl "$model" \
-      '.env.ANTHROPIC_BASE_URL = $url | .env.ANTHROPIC_API_KEY = $key | .env.ANTHROPIC_MODEL = $mdl' \
-      "$src_settings" > "$runner_dir/settings.json"
-  else
-    cat > "$runner_dir/settings.json" << JSON
+  # settings.json autocontenuto (non legge da ~/.claude)
+  cat > "$runner_dir/settings.json" << JSON
 {
   "env": {
     "ANTHROPIC_BASE_URL": "${base_url}",
     "ANTHROPIC_API_KEY": "${token}",
     "ANTHROPIC_MODEL": "${model}"
-  }
+  },
+  "skipDangerousModePermissionPrompt": true
 }
 JSON
-  fi
 }
 
 # ─── Stato attivo (runner + modello) ──────────────────────────────────────────
