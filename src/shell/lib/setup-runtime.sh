@@ -168,6 +168,9 @@ _create_app_bundle() {
   local macos_dir="$app_dir/Contents/MacOS"
   local ghostty_bin="/Applications/Ghostty.app/Contents/MacOS/ghostty"
 
+  # Skip se il bundle esiste già
+  [[ -f "$macos_dir/BigIDE" ]] && return 0
+
   mkdir -p "$macos_dir"
 
   # Info.plist

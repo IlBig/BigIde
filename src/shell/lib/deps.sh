@@ -19,7 +19,7 @@ _BREW_DEPS=(
   "lazygit:lazygit"     # TUI git completa (prefix + g g)
 )
 _BREW_CASKS=(ghostty)
-_NPM_GLOBALS=("@anthropic-ai/claude-code:claude" "perplexity-cli:perplexity")
+_NPM_GLOBALS=("@anthropic-ai/claude-code:claude" "perplexity-cli:perplexity-cli")
 
 # Disabilita auto-update brew (lento e blocca l'avvio)
 export HOMEBREW_NO_AUTO_UPDATE=1
