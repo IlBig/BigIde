@@ -352,8 +352,8 @@ show_session_dialog() {
     case "$key" in
       $'\033')  # Sequenza escape (frecce) oppure Esc puro
         local seq1 seq2
-        IFS= read -rsn1 -t 0.05 seq1 </dev/tty || true
-        IFS= read -rsn1 -t 0.05 seq2 </dev/tty || true
+        IFS= read -rsn1 -t 1 seq1 </dev/tty || true
+        IFS= read -rsn1 -t 1 seq2 </dev/tty || true
         if [[ "$seq1" == "[" ]]; then
           case "$seq2" in
             A) (( sel = sel == 0 ? 1 : 0 )); _ssd_draw ;;  # ↑

@@ -113,8 +113,48 @@ launch_claude() {
 
     log "INFO" "Avvio Claude (Anthropic) — modello: $model"
     exec claude --model "$model" $claude_flags
+
+  elif [[ "$runner" == "openai" || "$runner" == "gemini" ]]; then
+    # ── Provider OAuth: clona ~/.claude + overlay env ──
+    local runner_dir="$RUNNERS_DIR/$runner"
+    mkdir -p "$runner_dir"
+
+    # Clona ~/.claude nel runner dir (auth, config, ecc.)
+    rsync -a --exclude 'projects/' --exclude 'todos/' --exclude 'statsig/' \
+      "$HOME/.claude/" "$runner_dir/" 2>/dev/null || true
+
+    if [[ "$runner" == "openai" ]]; then
+      openai_oauth_ensure 2>/dev/null || true
+      local token base_url="https://api.openai.com/v1"
+      token="$(jq -r '.tokens.access_token // empty' "$HOME/.codex/auth.json" 2>/dev/null)" || true
+    else
+      gemini_oauth_ensure 2>/dev/null || true
+      local token base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+      token="$(jq -r '.tokens.access_token // empty' "$HOME/.gemini/auth.json" 2>/dev/null)" || true
+    fi
+
+    # Overlay settings.json con env provider
+    cat > "$runner_dir/settings.json" << JSON
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "${base_url}",
+    "ANTHROPIC_API_KEY": "${token}",
+    "ANTHROPIC_MODEL": "${model}"
+  }
+}
+JSON
+
+    _ensure_mcp_registered "$runner_dir"
+
+    log "INFO" "Avvio Claude — runner: $runner, modello: $model"
+    export ANTHROPIC_BASE_URL="$base_url"
+    export ANTHROPIC_API_KEY="$token"
+    export ANTHROPIC_MODEL="$model"
+    export CLAUDE_CONFIG_DIR="$runner_dir"
+    exec claude $claude_flags
+
   else
-    # ── Runner esterno: usa CLAUDE_CONFIG_DIR ──
+    # ── Runner custom: usa CLAUDE_CONFIG_DIR ──
     local runner_dir="$RUNNERS_DIR/$runner"
 
     if [[ ! -d "$runner_dir" || ! -f "$runner_dir/settings.json" ]]; then

@@ -59,6 +59,103 @@ _provider_status() {
   fi
 }
 
+# ─── Fetch dinamico modelli (come BigBot/src/gateway/server.ts) ───────────────
+
+_fetch_openai_models() {
+  # Ritorna lista modelli OpenAI filtrati, uno per riga
+  local token
+  token="$(jq -r '.tokens.access_token // empty' "$HOME/.codex/auth.json" 2>/dev/null)" || true
+  if [[ -z "$token" ]]; then _fallback_openai_models; return; fi
+
+  local response
+  response="$(curl -sf --max-time 5 \
+    -H "Authorization: Bearer $token" \
+    "https://api.openai.com/v1/models" 2>/dev/null)" || { _fallback_openai_models; return; }
+
+  local models
+  models="$(echo "$response" | jq -r '
+    .data[].id
+    | select(test("^(gpt-|o[0-9])"))
+    | select(test("(realtime|audio|search|transcribe|tts|whisper|embed|dall-e|image|sora|moderation)") | not)
+  ' 2>/dev/null | sort -rV)" || { _fallback_openai_models; return; }
+
+  if [[ -z "$models" ]]; then _fallback_openai_models; return; fi
+  echo "$models"
+}
+
+_fallback_openai_models() {
+  # Allineato a BigBot/openclaw + OpenAI API febbraio 2026
+  printf '%s\n' \
+    "gpt-5.2" \
+    "gpt-5.1" "gpt-5.1-codex" "gpt-5.1-codex-mini" "gpt-5.1-codex-max" \
+    "gpt-5.3-codex" \
+    "gpt-5-mini" \
+    "o3" "o3-pro" "o4-mini" \
+    "gpt-4.1" "gpt-4.1-mini" "gpt-4.1-nano" \
+    "gpt-4o" "gpt-4o-mini"
+}
+
+_fetch_gemini_models() {
+  local token
+  token="$(jq -r '.tokens.access_token // empty' "$HOME/.gemini/auth.json" 2>/dev/null)" || true
+  if [[ -z "$token" ]]; then _fallback_gemini_models; return; fi
+
+  local response
+  response="$(curl -sf --max-time 5 \
+    -H "Authorization: Bearer $token" \
+    "https://generativelanguage.googleapis.com/v1beta/models?pageSize=100" 2>/dev/null)" || { _fallback_gemini_models; return; }
+
+  local models
+  models="$(echo "$response" | jq -r '
+    .models[]
+    | select(.supportedGenerationMethods? // [] | index("generateContent"))
+    | .name | sub("^models/"; "")
+    | select(test("^gemini-"))
+  ' 2>/dev/null | sort -rV)" || { _fallback_gemini_models; return; }
+
+  if [[ -z "$models" ]]; then _fallback_gemini_models; return; fi
+  echo "$models"
+}
+
+_fallback_gemini_models() {
+  # Allineato a Google AI docs febbraio 2026
+  printf '%s\n' \
+    "gemini-3.1-pro-preview" \
+    "gemini-3-flash-preview" "gemini-3-pro-preview" \
+    "gemini-2.5-pro" "gemini-2.5-flash" "gemini-2.5-flash-lite"
+}
+
+# ─── Genera runner config per provider non-Anthropic ─────────────────────────
+_create_runner_config() {
+  local provider="$1" model="$2"
+  local runner_dir="$RUNNERS_DIR/$provider"
+  mkdir -p "$runner_dir"
+
+  # Clona ~/.claude nel runner dir (auth, config, ecc.)
+  rsync -a --exclude 'projects/' --exclude 'todos/' --exclude 'statsig/' \
+    "$HOME/.claude/" "$runner_dir/" 2>/dev/null || true
+
+  local token="" base_url=""
+  if [[ "$provider" == "openai" ]]; then
+    token="$(jq -r '.tokens.access_token // empty' "$HOME/.codex/auth.json" 2>/dev/null)" || true
+    base_url="https://api.openai.com/v1"
+  elif [[ "$provider" == "gemini" ]]; then
+    token="$(jq -r '.tokens.access_token // empty' "$HOME/.gemini/auth.json" 2>/dev/null)" || true
+    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+  fi
+
+  # Overlay settings.json con env provider
+  cat > "$runner_dir/settings.json" << JSON
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "${base_url}",
+    "ANTHROPIC_API_KEY": "${token}",
+    "ANTHROPIC_MODEL": "${model}"
+  }
+}
+JSON
+}
+
 # ─── Stato attivo (runner + modello) ──────────────────────────────────────────
 
 _get_active_key() {
@@ -206,8 +303,8 @@ _phase1() {
     case "$key" in
       $'\033')
         local seq1 seq2
-        IFS= read -rsn1 -t 0.05 seq1 </dev/tty || true
-        IFS= read -rsn1 -t 0.05 seq2 </dev/tty || true
+        IFS= read -rsn1 -t 1 seq1 </dev/tty || true
+        IFS= read -rsn1 -t 1 seq2 </dev/tty || true
         if [[ "$seq1" == "[" ]]; then
           case "$seq2" in
             A) (( sel = (sel - 1 + n_items) % n_items )); _p1_draw ;;  # ↑
@@ -257,7 +354,7 @@ _phase1() {
             ;;
           3)  # Continua → Fase 2
             tput cnorm 2>/dev/null || true
-            _phase2 "$status_claude"
+            _phase2 "$status_claude" "$status_openai" "$status_gemini"
             return $?
             ;;
         esac
@@ -273,13 +370,15 @@ _phase1() {
 
 _phase2() {
   local st_claude="${1:-disconnected}"
+  local st_openai="${2:-disconnected}"
+  local st_gemini="${3:-disconnected}"
 
   local active_key
   active_key="$(_get_active_key)"
 
   # Costruisci lista: (tipo|display|item_key|action_type)
-  #   item_key = "anthropic:<alias>" o "custom:<runner_name>"
-  #   action_type = "anthropic" o "custom"
+  #   item_key = "<provider>:<model>" — es. "anthropic:sonnet", "openai:o3"
+  #   action_type = "anthropic" | "openai" | "gemini" | "custom"
   local items=()
 
   # ── Modelli Anthropic (nativi, --model flag) ──
@@ -291,6 +390,22 @@ _phase2() {
     items+=("model|OpusPlan (opus+sonnet)|anthropic:opusplan|anthropic")
   fi
 
+  # ── Modelli OpenAI (fetch dinamico da API, fallback statico) ──
+  if [[ "$st_openai" == "connected" ]]; then
+    items+=("header|── OpenAI (Codex) ──────────────────────")
+    while IFS= read -r m; do
+      [[ -n "$m" ]] && items+=("model|${m}|openai:${m}|openai")
+    done < <(_fetch_openai_models)
+  fi
+
+  # ── Modelli Gemini (fetch dinamico da API, fallback statico) ──
+  if [[ "$st_gemini" == "connected" ]]; then
+    items+=("header|── Google (Gemini) ─────────────────────")
+    while IFS= read -r m; do
+      [[ -n "$m" ]] && items+=("model|${m}|gemini:${m}|gemini")
+    done < <(_fetch_gemini_models)
+  fi
+
   # ── Runner custom (CLAUDE_CONFIG_DIR) ──
   local has_custom=false
   if [[ -d "$RUNNERS_DIR" ]]; then
@@ -299,7 +414,6 @@ _phase2() {
       has_custom=true
       local rname
       rname="$(basename "$rdir")"
-      # Estrai modello dal settings.json per display
       local rmodel
       rmodel="$(jq -r '.env.ANTHROPIC_MODEL // "n/a"' "${rdir}settings.json" 2>/dev/null)" || rmodel="n/a"
       items+=("model|${rname} (${rmodel})|custom:${rname}|custom")
@@ -307,8 +421,6 @@ _phase2() {
   fi
 
   if [[ "$has_custom" == true ]]; then
-    # Inserisci header custom prima dei runner custom
-    # Trova l'indice del primo runner custom e inserisci l'header
     local new_items=()
     local inserted=false
     for entry in "${items[@]}"; do
@@ -325,7 +437,9 @@ _phase2() {
   items+=("model|◂ Torna ai provider|_back|_back")
 
   # Se nessun provider e nessun runner custom
-  if [[ "$st_claude" != "connected" && "$has_custom" != true ]]; then
+  local any_connected=false
+  [[ "$st_claude" == "connected" || "$st_openai" == "connected" || "$st_gemini" == "connected" || "$has_custom" == true ]] && any_connected=true
+  if [[ "$any_connected" != true ]]; then
     items=()
     items+=("header|  Nessun provider connesso!")
     items+=("header|  Torna indietro e fai login.")
@@ -365,17 +479,57 @@ _phase2() {
   local box_total=$(( box_w + 2 ))
   local col=$(( (TERM_W - box_total) / 2 ))
   (( col < 1 )) && col=1 || true
-  local box_h=$(( ${#items[@]} + 6 ))
+
+  # Chrome: top border(1) + vuota(1) + titolo(1) + vuota(1) + vuota(1) + footer(1) + bottom(1) = 7
+  local chrome=7
+  local n_items=${#items[@]}
+  local max_visible=$(( TERM_H - chrome - 2 ))  # -2 margine
+  (( max_visible < 5 )) && max_visible=5 || true
+  (( max_visible > n_items )) && max_visible=$n_items || true
+
+  local box_h=$(( max_visible + chrome ))
   local top=$(( (TERM_H - box_h) / 2 ))
   (( top < 1 )) && top=1 || true
+
+  local scroll_off=0  # primo item visibile
+
+  # Assicura che l'item selezionato sia visibile
+  _scroll_to_sel() {
+    local cur_item=${selectable[$sel_idx]}
+    # Scorri in basso se l'item è sotto il viewport
+    while (( cur_item >= scroll_off + max_visible )); do
+      (( scroll_off++ ))
+    done
+    # Scorri in alto se l'item è sopra il viewport
+    while (( cur_item < scroll_off )); do
+      (( scroll_off-- ))
+    done
+  }
+
+  _scroll_to_sel  # posiziona viewport sull'item pre-selezionato
 
   tput civis 2>/dev/null || true
 
   _p2_draw() {
     local r=$top c=$col w=$box_w
     local cur_item=${selectable[$sel_idx]}
+    local need_scroll=0
+    (( n_items > max_visible )) && need_scroll=1 || true
 
-    # Top
+    # ── Scrollbar: calcola posizione thumb ──
+    local sb_thumb_start=0 sb_thumb_end=0
+    if (( need_scroll )); then
+      local sb_size=$(( max_visible * max_visible / n_items ))
+      (( sb_size < 1 )) && sb_size=1 || true
+      local sb_range=$(( max_visible - sb_size ))
+      local scroll_range=$(( n_items - max_visible ))
+      if (( scroll_range > 0 )); then
+        sb_thumb_start=$(( scroll_off * sb_range / scroll_range ))
+      fi
+      sb_thumb_end=$(( sb_thumb_start + sb_size ))
+    fi
+
+    # ── Top border ──
     _goto "$r" "$c"
     printf '%s┌' "$_C_FRAME"
     printf '─%.0s' $(seq 1 "$w")
@@ -396,27 +550,35 @@ _phase2() {
     # Vuota
     _goto "$r" "$c"; printf '%s│%*s│%s' "$_C_FRAME" "$w" "" "$_C_RESET"; (( r++ ))
 
-    # Items
+    # ── Items (solo viewport) ──
     local opad=4
-    for i in "${!items[@]}"; do
+    local vi=0  # indice viewport (0..max_visible-1)
+    local i=$(( scroll_off ))
+    while (( vi < max_visible && i < n_items )); do
       local entry="${items[$i]}"
       local type="${entry%%|*}"
       local rest="${entry#*|}"
+
+      # Scrollbar: bordo destro
+      local rborder="│"
+      if (( need_scroll )); then
+        if (( vi >= sb_thumb_start && vi < sb_thumb_end )); then
+          rborder="┃"
+        fi
+      fi
 
       _goto "$r" "$c"
 
       if [[ "$type" == "header" ]]; then
         local htext="$rest"
-        printf '%s│%*s%s%s%*s%s│%s' \
-          "$_C_FRAME" "$opad" "" "$_C_DIM" "$htext" $(( w - opad - ${#htext} )) "" "$_C_FRAME" "$_C_RESET"
+        printf '%s│%*s%s%s%*s%s%s%s' \
+          "$_C_FRAME" "$opad" "" "$_C_DIM" "$htext" $(( w - opad - ${#htext} )) "" "$_C_FRAME" "$rborder" "$_C_RESET"
       else
-        # Model selezionabile
         local display="${rest%%|*}"
         local tmp2="${rest#*|}"
         local item_key="${tmp2%%|*}"
         local mark color active_mark=""
 
-        # Segna modello attivo
         if [[ -n "$active_key" && "$item_key" == "$active_key" ]]; then
           active_mark=" ${_C_GREEN}●${_C_RESET}"
         fi
@@ -431,15 +593,17 @@ _phase2() {
         local label_len=${#label}
         local active_visual=0
         if [[ -n "$active_mark" ]]; then
-          active_visual=2  # spazio + ●
+          active_visual=2
         fi
         local pad=$(( w - opad - label_len - active_visual ))
         (( pad < 0 )) && pad=0 || true
 
-        printf '%s│%*s%s%s%*s%s%s│%s' \
-          "$_C_FRAME" "$opad" "" "$color" "$label" "$pad" "" "$active_mark" "$_C_FRAME" "$_C_RESET"
+        printf '%s│%*s%s%s%*s%s%s%s%s' \
+          "$_C_FRAME" "$opad" "" "$color" "$label" "$pad" "" "$active_mark" "$_C_FRAME" "$rborder" "$_C_RESET"
       fi
       (( r++ ))
+      (( vi++ ))
+      (( i++ ))
     done
 
     # Vuota
@@ -447,6 +611,9 @@ _phase2() {
 
     # Footer
     local hint="↑↓ naviga  Enter seleziona  Esc esci"
+    if (( need_scroll )); then
+      hint="↑↓ scorri  Enter seleziona  Esc esci"
+    fi
     local hpad=$(( (w - ${#hint}) / 2 ))
     _goto "$r" "$c"
     printf '%s│%*s%s%s%*s%s│%s' \
@@ -460,6 +627,11 @@ _phase2() {
     printf '┘%s' "$_C_RESET"
   }
 
+  _p2_nav() {
+    _scroll_to_sel
+    _p2_draw
+  }
+
   printf '\033[2J\033[H'
   _p2_draw
 
@@ -469,20 +641,20 @@ _phase2() {
     case "$key" in
       $'\033')
         local seq1 seq2
-        IFS= read -rsn1 -t 0.05 seq1 </dev/tty || true
-        IFS= read -rsn1 -t 0.05 seq2 </dev/tty || true
+        IFS= read -rsn1 -t 1 seq1 </dev/tty || true
+        IFS= read -rsn1 -t 1 seq2 </dev/tty || true
         if [[ "$seq1" == "[" ]]; then
           case "$seq2" in
-            A) (( sel_idx = (sel_idx - 1 + n_sel) % n_sel )); _p2_draw ;;
-            B) (( sel_idx = (sel_idx + 1) % n_sel )); _p2_draw ;;
+            A) (( sel_idx = (sel_idx - 1 + n_sel) % n_sel )); _p2_nav ;;
+            B) (( sel_idx = (sel_idx + 1) % n_sel )); _p2_nav ;;
           esac
         else
           tput cnorm 2>/dev/null || true; exit 0
         fi
         ;;
-      k) (( sel_idx = (sel_idx - 1 + n_sel) % n_sel )); _p2_draw ;;
-      j) (( sel_idx = (sel_idx + 1) % n_sel )); _p2_draw ;;
-      $'\t') (( sel_idx = (sel_idx + 1) % n_sel )); _p2_draw ;;
+      k) (( sel_idx = (sel_idx - 1 + n_sel) % n_sel )); _p2_nav ;;
+      j) (( sel_idx = (sel_idx + 1) % n_sel )); _p2_nav ;;
+      $'\t') (( sel_idx = (sel_idx + 1) % n_sel )); _p2_nav ;;
       "")  # Enter
         local chosen_entry="${items[${selectable[$sel_idx]}]}"
         local chosen_rest="${chosen_entry#*|}"
@@ -520,6 +692,19 @@ _apply_selection() {
     local alias="${item_key#anthropic:}"
     echo "anthropic" > "$BIGIDE_HOME/active-runner"
     echo "$alias"    > "$BIGIDE_HOME/active-model"
+  elif [[ "$action_type" == "openai" ]]; then
+    # item_key = "openai:<model>" → es. "openai:o3"
+    local model="${item_key#openai:}"
+    echo "openai" > "$BIGIDE_HOME/active-runner"
+    echo "$model" > "$BIGIDE_HOME/active-model"
+    # Genera runner config con token OAuth fresco
+    _create_runner_config "openai" "$model"
+  elif [[ "$action_type" == "gemini" ]]; then
+    # item_key = "gemini:<model>" → es. "gemini:gemini-2.5-pro"
+    local model="${item_key#gemini:}"
+    echo "gemini" > "$BIGIDE_HOME/active-runner"
+    echo "$model" > "$BIGIDE_HOME/active-model"
+    _create_runner_config "gemini" "$model"
   else
     # item_key = "custom:<runner_name>" → es. "custom:kimi"
     local runner_name="${item_key#custom:}"
