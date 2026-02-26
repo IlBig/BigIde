@@ -152,10 +152,6 @@ _create_runner_config() {
   local runner_dir="$RUNNERS_DIR/$provider"
   mkdir -p "$runner_dir"
 
-  # Clona ~/.claude nel runner dir (auth, config, ecc.)
-  rsync -a --exclude 'projects/' --exclude 'todos/' --exclude 'statsig/' \
-    "$HOME/.claude/" "$runner_dir/" 2>/dev/null || true
-
   local token="" base_url=""
   if [[ "$provider" == "openai" ]]; then
     token="$(jq -r '.tokens.access_token // empty' "$HOME/.codex/auth.json" 2>/dev/null)" || true
@@ -165,8 +161,14 @@ _create_runner_config() {
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
   fi
 
-  # Overlay settings.json con env provider
-  cat > "$runner_dir/settings.json" << JSON
+  # Merge: prende ~/.claude/settings.json come base, aggiunge env provider
+  local src_settings="$HOME/.claude/settings.json"
+  if [[ -f "$src_settings" ]] && command -v jq >/dev/null 2>&1; then
+    jq --arg url "$base_url" --arg key "$token" --arg mdl "$model" \
+      '.env.ANTHROPIC_BASE_URL = $url | .env.ANTHROPIC_API_KEY = $key | .env.ANTHROPIC_MODEL = $mdl' \
+      "$src_settings" > "$runner_dir/settings.json"
+  else
+    cat > "$runner_dir/settings.json" << JSON
 {
   "env": {
     "ANTHROPIC_BASE_URL": "${base_url}",
@@ -175,6 +177,7 @@ _create_runner_config() {
   }
 }
 JSON
+  fi
 }
 
 # ─── Stato attivo (runner + modello) ──────────────────────────────────────────

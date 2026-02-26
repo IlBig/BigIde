@@ -115,21 +115,18 @@ launch_claude() {
     exec claude --model "$model" $claude_flags
 
   elif [[ "$runner" == "openai" || "$runner" == "gemini" ]]; then
-    # ── Provider OAuth: clona ~/.claude + overlay env ──
+    # ── Provider esterno: settings.json con env vars ──
     local runner_dir="$RUNNERS_DIR/$runner"
     mkdir -p "$runner_dir"
 
-    # Clona ~/.claude nel runner dir (auth, config, ecc.)
-    rsync -a --exclude 'projects/' --exclude 'todos/' --exclude 'statsig/' \
-      "$HOME/.claude/" "$runner_dir/" 2>/dev/null || true
-
+    local token="" base_url=""
     if [[ "$runner" == "openai" ]]; then
       openai_oauth_ensure 2>/dev/null || true
-      local token base_url="https://api.openai.com/v1"
+      base_url="https://api.openai.com/v1"
       token="$(jq -r '.tokens.access_token // empty' "$HOME/.codex/auth.json" 2>/dev/null)" || true
     else
       # Gemini: usa API Key (OAuth token non funziona con endpoint pubblico)
-      local token base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
+      base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
       local gemini_key_file="$BIGIDE_HOME/gemini-api-key"
       if [[ -n "${GEMINI_API_KEY:-}" ]]; then
         token="$GEMINI_API_KEY"
@@ -140,8 +137,14 @@ launch_claude() {
       fi
     fi
 
-    # Overlay settings.json con env provider
-    cat > "$runner_dir/settings.json" << JSON
+    # Merge settings.json: prende ~/.claude/settings.json come base, aggiunge env provider
+    local src_settings="$HOME/.claude/settings.json"
+    if [[ -f "$src_settings" ]] && command -v jq >/dev/null 2>&1; then
+      jq --arg url "$base_url" --arg key "$token" --arg mdl "$model" \
+        '.env.ANTHROPIC_BASE_URL = $url | .env.ANTHROPIC_API_KEY = $key | .env.ANTHROPIC_MODEL = $mdl' \
+        "$src_settings" > "$runner_dir/settings.json"
+    else
+      cat > "$runner_dir/settings.json" << JSON
 {
   "env": {
     "ANTHROPIC_BASE_URL": "${base_url}",
@@ -150,13 +153,11 @@ launch_claude() {
   }
 }
 JSON
+    fi
 
     _ensure_mcp_registered "$runner_dir"
 
     log "INFO" "Avvio Claude — runner: $runner, modello: $model"
-    export ANTHROPIC_BASE_URL="$base_url"
-    export ANTHROPIC_API_KEY="$token"
-    export ANTHROPIC_MODEL="$model"
     export CLAUDE_CONFIG_DIR="$runner_dir"
     exec claude $claude_flags
 
