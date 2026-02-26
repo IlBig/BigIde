@@ -128,9 +128,16 @@ launch_claude() {
       local token base_url="https://api.openai.com/v1"
       token="$(jq -r '.tokens.access_token // empty' "$HOME/.codex/auth.json" 2>/dev/null)" || true
     else
-      gemini_oauth_ensure 2>/dev/null || true
+      # Gemini: usa API Key (OAuth token non funziona con endpoint pubblico)
       local token base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-      token="$(jq -r '.tokens.access_token // empty' "$HOME/.gemini/auth.json" 2>/dev/null)" || true
+      local gemini_key_file="$BIGIDE_HOME/gemini-api-key"
+      if [[ -n "${GEMINI_API_KEY:-}" ]]; then
+        token="$GEMINI_API_KEY"
+      elif [[ -n "${GOOGLE_API_KEY:-}" ]]; then
+        token="$GOOGLE_API_KEY"
+      elif [[ -f "$gemini_key_file" ]]; then
+        token="$(cat "$gemini_key_file" 2>/dev/null)" || true
+      fi
     fi
 
     # Overlay settings.json con env provider

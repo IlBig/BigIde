@@ -45,6 +45,17 @@ _detect_size() {
   fi
 }
 
+# ─── Gemini API Key ──────────────────────────────────────────────────────────
+GEMINI_API_KEY_FILE="$BIGIDE_HOME/gemini-api-key"
+
+_get_gemini_api_key() {
+  # Priorità: env var > file
+  if [[ -n "${GEMINI_API_KEY:-}" ]]; then echo "$GEMINI_API_KEY"; return; fi
+  if [[ -n "${GOOGLE_API_KEY:-}" ]]; then echo "$GOOGLE_API_KEY"; return; fi
+  if [[ -f "$GEMINI_API_KEY_FILE" ]]; then cat "$GEMINI_API_KEY_FILE" 2>/dev/null; return; fi
+  echo ""
+}
+
 # ─── Stato provider ──────────────────────────────────────────────────────────
 _check_provider() {
   local script="$BIGIDE_REPO_ROOT/config/scripts/oauth-${1}.mjs"
@@ -52,10 +63,21 @@ _check_provider() {
 }
 
 _provider_status() {
-  if _check_provider "$1"; then
-    echo "connected"
+  if [[ "$1" == "gemini" ]]; then
+    # Gemini: basta la API key per funzionare
+    local key
+    key="$(_get_gemini_api_key)"
+    if [[ -n "$key" ]]; then
+      echo "connected"
+    else
+      echo "disconnected"
+    fi
   else
-    echo "disconnected"
+    if _check_provider "$1"; then
+      echo "connected"
+    else
+      echo "disconnected"
+    fi
   fi
 }
 
@@ -96,14 +118,13 @@ _fallback_openai_models() {
 }
 
 _fetch_gemini_models() {
-  local token
-  token="$(jq -r '.tokens.access_token // empty' "$HOME/.gemini/auth.json" 2>/dev/null)" || true
-  if [[ -z "$token" ]]; then _fallback_gemini_models; return; fi
+  local api_key
+  api_key="$(_get_gemini_api_key)"
+  if [[ -z "$api_key" ]]; then _fallback_gemini_models; return; fi
 
   local response
   response="$(curl -sf --max-time 5 \
-    -H "Authorization: Bearer $token" \
-    "https://generativelanguage.googleapis.com/v1beta/models?pageSize=100" 2>/dev/null)" || { _fallback_gemini_models; return; }
+    "https://generativelanguage.googleapis.com/v1beta/models?pageSize=100&key=${api_key}" 2>/dev/null)" || { _fallback_gemini_models; return; }
 
   local models
   models="$(echo "$response" | jq -r '
@@ -140,7 +161,7 @@ _create_runner_config() {
     token="$(jq -r '.tokens.access_token // empty' "$HOME/.codex/auth.json" 2>/dev/null)" || true
     base_url="https://api.openai.com/v1"
   elif [[ "$provider" == "gemini" ]]; then
-    token="$(jq -r '.tokens.access_token // empty' "$HOME/.gemini/auth.json" 2>/dev/null)" || true
+    token="$(_get_gemini_api_key)"
     base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
   fi
 
@@ -240,7 +261,7 @@ _phase1() {
 
     # ── Provider: Gemini ──
     lbl="Google (Gemini)"
-    badge_text="$([[ "$status_gemini" == "connected" ]] && echo "✓ connesso" || echo "✗ da collegare")"
+    badge_text="$([[ "$status_gemini" == "connected" ]] && echo "✓ API Key" || echo "✗ serve API Key")"
     badge_color="$([[ "$status_gemini" == "connected" ]] && printf '%s' "$_C_GREEN" || printf '%s' "$_C_RED")"
     if (( sel == 2 )); then mark="▸ "; color="$_C_CYAN"; else mark="  "; color="$_C_DIM"; fi
     _goto "$r" "$c"
@@ -341,11 +362,38 @@ _phase1() {
             printf '\033[2J\033[H'
             _p1_draw
             ;;
-          2)  # Login Gemini
+          2)  # Configura Gemini (API Key)
             printf '\033[2J\033[H'
             tput cnorm 2>/dev/null || true
-            node "$BIGIDE_REPO_ROOT/config/scripts/oauth-gemini.mjs" login </dev/tty || true
-            echo; echo "Premi un tasto per tornare al menu..."
+            echo
+            echo "  ${_C_VIOLET}Google Gemini — Configurazione API Key${_C_RESET}"
+            echo
+            echo "  ${_C_DIM}Per usare Gemini serve una API Key gratuita.${_C_RESET}"
+            echo "  ${_C_DIM}Ottienila da: ${_C_CYAN}https://aistudio.google.com/apikey${_C_RESET}"
+            echo
+            local current_key
+            current_key="$(_get_gemini_api_key)"
+            if [[ -n "$current_key" ]]; then
+              echo "  ${_C_GREEN}✓ API Key configurata${_C_RESET} (${current_key:0:8}...)"
+              echo
+              echo -n "  Nuova key (Invio per mantenere, 'd' per rimuovere): "
+            else
+              echo -n "  Incolla la API Key: "
+            fi
+            local api_input
+            IFS= read -r api_input </dev/tty
+            api_input="${api_input## }"  # trim leading spaces
+            api_input="${api_input%% }"  # trim trailing spaces
+            if [[ "$api_input" == "d" || "$api_input" == "D" ]]; then
+              rm -f "$GEMINI_API_KEY_FILE"
+              echo "  ${_C_RED}API Key rimossa${_C_RESET}"
+            elif [[ -n "$api_input" ]]; then
+              mkdir -p "$BIGIDE_HOME"
+              echo -n "$api_input" > "$GEMINI_API_KEY_FILE"
+              chmod 600 "$GEMINI_API_KEY_FILE"
+              echo "  ${_C_GREEN}✓ API Key salvata${_C_RESET}"
+            fi
+            echo; echo "  Premi un tasto per tornare al menu..."
             IFS= read -rsn1 </dev/tty
             status_gemini="$(_provider_status gemini)"
             tput civis 2>/dev/null || true

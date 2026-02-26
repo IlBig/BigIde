@@ -33,7 +33,6 @@ const CALLBACK_PORT      = 8085;
 const REDIRECT_URI       = `http://127.0.0.1:${CALLBACK_PORT}/oauth2callback`;
 const SCOPES             = [
   'https://www.googleapis.com/auth/cloud-platform',
-  'https://www.googleapis.com/auth/generative-language',
   'https://www.googleapis.com/auth/userinfo.email',
   'https://www.googleapis.com/auth/userinfo.profile',
 ].join(' ');
