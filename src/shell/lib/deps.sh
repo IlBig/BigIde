@@ -19,7 +19,12 @@ _BREW_DEPS=(
   "lazygit:lazygit"     # TUI git completa (prefix + g g)
 )
 _BREW_CASKS=(ghostty)
-_NPM_GLOBALS=("@anthropic-ai/claude-code:claude" "perplexity-cli:perplexity-cli")
+_NPM_GLOBALS=(
+  "@anthropic-ai/claude-code:claude"
+  "@openai/codex:codex"
+  "@google/gemini-cli:gemini"
+  "perplexity-cli:perplexity-cli"
+)
 
 # Disabilita auto-update brew (lento e blocca l'avvio)
 export HOMEBREW_NO_AUTO_UPDATE=1
@@ -82,13 +87,6 @@ _ensure_bun() {
   curl -fsSL https://bun.sh/install | bash || log "WARN" "Impossibile installare Bun"
 }
 
-_ensure_uv() {
-  _check_cmd uv && return
-  [[ -x "$HOME/.local/bin/uv" ]] && return  # installato ma non ancora in PATH
-  log "INFO" "Installazione uv..."
-  curl -LsSf https://astral.sh/uv/install.sh | sh || log "WARN" "Impossibile installare uv"
-}
-
 _ensure_mcp_build() {
   local dist="$BIGIDE_REPO_ROOT/src/mcp/dist/index.js"
   [[ -f "$dist" ]] && return
@@ -106,15 +104,6 @@ _ensure_pip_deps() {
   fi
 }
 
-_ensure_litellm() {
-  command -v litellm >/dev/null 2>&1 && return
-  [[ -x "$HOME/.local/bin/litellm" ]] && return
-  log "INFO" "Installazione LiteLLM proxy..."
-  uv tool install litellm --with 'litellm[proxy]' --with python-multipart 2>/dev/null \
-    || pip3 install -q 'litellm[proxy]' python-multipart 2>/dev/null \
-    || log "WARN" "Impossibile installare LiteLLM"
-}
-
 # ── Entry point principale ────────────────────────────────────────────────────
 
 ensure_dependencies() {
@@ -124,17 +113,15 @@ ensure_dependencies() {
   _ensure_gitmux
   _ensure_npm_globals
   _ensure_bun
-  _ensure_uv
   _ensure_mcp_build
   _ensure_pip_deps
-  _ensure_litellm
   # LazyVim plugins installati da init_runtime() dopo copia config
 }
 
 # Verifica rapida (solo check, no install) — usata per messaggi diagnostici
 check_dependencies() {
   local ok=1
-  for cmd in tmux jq git nvim claude; do
+  for cmd in tmux jq git nvim claude codex gemini; do
     if ! _check_cmd "$cmd"; then
       log "WARN" "Dipendenza mancante: $cmd (verrà installata automaticamente)"
       ok=0

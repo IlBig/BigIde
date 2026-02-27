@@ -98,10 +98,6 @@ create_layout() {
   tmux set-hook -t "$session_name" client-resized \
     "run-shell 'tw=\$(tmux display-message -p \"#{window_width}\"); half=\$(( (tw - 42) / 2 )); tmux resize-pane -t ${left_top_id} -x 40 2>/dev/null; tmux resize-pane -t ${gitbar_pane} -y 1 2>/dev/null; tmux resize-pane -t ${terminal_pane_id} -x \$half 2>/dev/null; true'"
 
-  # Hook: ferma proxy LiteLLM quando la sessione BigIDE chiude
-  tmux set-hook -t "$session_name" session-closed \
-    "run-shell '$HOME/.bigide/scripts/proxy-stop.sh 2>/dev/null || true'"
-
   # Seleziona claude come pane attivo
   tmux select-pane -t "$right_top_id"
 }
