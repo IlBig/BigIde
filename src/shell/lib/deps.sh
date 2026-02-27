@@ -106,6 +106,15 @@ _ensure_pip_deps() {
   fi
 }
 
+_ensure_litellm() {
+  command -v litellm >/dev/null 2>&1 && return
+  [[ -x "$HOME/.local/bin/litellm" ]] && return
+  log "INFO" "Installazione LiteLLM proxy..."
+  uv tool install litellm --with 'litellm[proxy]' --with python-multipart 2>/dev/null \
+    || pip3 install -q 'litellm[proxy]' python-multipart 2>/dev/null \
+    || log "WARN" "Impossibile installare LiteLLM"
+}
+
 # ── Entry point principale ────────────────────────────────────────────────────
 
 ensure_dependencies() {
@@ -118,6 +127,7 @@ ensure_dependencies() {
   _ensure_uv
   _ensure_mcp_build
   _ensure_pip_deps
+  _ensure_litellm
   # LazyVim plugins installati da init_runtime() dopo copia config
 }
 

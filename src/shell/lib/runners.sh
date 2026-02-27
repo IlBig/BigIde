@@ -4,14 +4,15 @@ set -euo pipefail
 # ── BigIDE Runner: gestione profili multi-provider per Claude Code ──────────
 #
 # Approccio:
-#   Anthropic (nativo) → claude --model <alias>  (auth via ~/.claude)
-#   Altri provider      → CLAUDE_CONFIG_DIR=<runner_dir> claude
-#                         settings.json con ANTHROPIC_BASE_URL, ANTHROPIC_API_KEY, ANTHROPIC_MODEL
+#   Anthropic (nativo)  → claude --model <alias>  (auth via ~/.claude)
+#   OpenAI / Gemini     → LiteLLM proxy (127.0.0.1:4000) traduce Anthropic → nativo
+#   Runner custom       → CLAUDE_CONFIG_DIR=<runner_dir> claude
 #
 # Struttura:
-#   ~/.bigide/active-runner    → "anthropic" | "kimi" | "openai" | ...
-#   ~/.bigide/active-model     → "opus" | "sonnet" | "kimi-k2.5" | ...
-#   ~/.bigide/runners/<id>/    → cartella con settings.json (solo per runner non-Anthropic)
+#   ~/.bigide/active-runner    → "anthropic" | "openai" | "gemini" | ...
+#   ~/.bigide/active-model     → "opus" | "sonnet" | "gpt-5.1" | "gemini-2.5-pro" | ...
+#   ~/.bigide/proxy/           → config YAML, PID, log del proxy LiteLLM
+#   ~/.bigide/runners/<id>/    → cartella con settings.json (solo per runner custom)
 
 RUNNERS_DIR="$BIGIDE_HOME/runners"
 ACTIVE_RUNNER_FILE="$BIGIDE_HOME/active-runner"
@@ -106,6 +107,9 @@ launch_claude() {
 
   if [[ "$runner" == "anthropic" ]]; then
     # ── Anthropic nativo: usa --model, auth via ~/.claude ──
+    # Ferma proxy se era attivo da un runner precedente
+    proxy_stop 2>/dev/null || true
+
     claude_oauth_ensure 2>/dev/null || true
 
     # MCP nel config dir standard
@@ -115,44 +119,25 @@ launch_claude() {
     exec claude --model "$model" $claude_flags
 
   elif [[ "$runner" == "openai" || "$runner" == "gemini" ]]; then
-    # ── Provider esterno: tutto autocontenuto in ~/.bigide/runners/<id> ──
-    local runner_dir="$RUNNERS_DIR/$runner"
-    mkdir -p "$runner_dir"
-
-    local token="" base_url=""
+    # ── Provider esterno: LiteLLM proxy traduce Anthropic → OpenAI/Gemini ──
     if [[ "$runner" == "openai" ]]; then
       openai_oauth_ensure 2>/dev/null || true
-      base_url="https://api.openai.com/v1"
-      token="$(jq -r '.tokens.access_token // empty' "$HOME/.codex/auth.json" 2>/dev/null)" || true
-    else
-      base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-      local gemini_key_file="$BIGIDE_HOME/gemini-api-key"
-      if [[ -n "${GEMINI_API_KEY:-}" ]]; then
-        token="$GEMINI_API_KEY"
-      elif [[ -n "${GOOGLE_API_KEY:-}" ]]; then
-        token="$GOOGLE_API_KEY"
-      elif [[ -f "$gemini_key_file" ]]; then
-        token="$(cat "$gemini_key_file" 2>/dev/null)" || true
-      fi
     fi
 
-    # settings.json autocontenuto (non legge da ~/.claude)
-    cat > "$runner_dir/settings.json" << JSON
-{
-  "env": {
-    "ANTHROPIC_BASE_URL": "${base_url}",
-    "ANTHROPIC_API_KEY": "${token}",
-    "ANTHROPIC_MODEL": "${model}"
-  },
-  "skipDangerousModePermissionPrompt": true
-}
-JSON
+    # Avvia/verifica proxy LiteLLM
+    proxy_ensure "$runner" "$model" || {
+      log "ERROR" "Impossibile avviare LiteLLM proxy per $runner/$model"
+      exit 1
+    }
 
-    _ensure_mcp_registered "$runner_dir"
+    # MCP nel config dir standard
+    _ensure_mcp_registered "$HOME/.claude"
 
-    log "INFO" "Avvio Claude — runner: $runner, modello: $model"
-    export CLAUDE_CONFIG_DIR="$runner_dir"
-    exec claude $claude_flags
+    log "INFO" "Avvio Claude — runner: $runner, modello: $model (via LiteLLM proxy)"
+    exec env \
+      ANTHROPIC_BASE_URL="http://${PROXY_HOST:-127.0.0.1}:${PROXY_PORT:-4000}" \
+      ANTHROPIC_API_KEY="$PROXY_MASTER_KEY" \
+      claude --model "$model" $claude_flags
 
   else
     # ── Runner custom: usa CLAUDE_CONFIG_DIR ──

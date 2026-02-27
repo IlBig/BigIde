@@ -75,21 +75,32 @@ create_layout() {
   tmux set-option -p -t "$logs_pane_id"     @bigide_pane_type "logs"
   tmux set-option -p -t "$gitbar_pane"      @bigide_pane_type "gitbar"
 
-  # Avvio strumenti
-  tmux send-keys -t "$left_top_id"      'clear; $HOME/.bigide/scripts/filetree.sh' C-m
+  # Project path dalla sessione tmux (impostato da bigide con -c "$PROJECT_PATH")
+  # Espande ~ → $HOME (tmux può restituire path con tilde letterale)
+  local project_path
+  project_path="$(tmux display-message -p -t "${session_name}" '#{session_path}')"
+  project_path="${project_path/#\~/$HOME}"
+
+  # Salva project path per _restart_claude_resume e altri script
+  echo "$project_path" > "$BIGIDE_HOME/active-project-path"
+
+  # Avvio strumenti — cd esplicito in ogni pane per sicurezza
+  tmux send-keys -t "$left_top_id"      "cd '${project_path}' && clear; \$HOME/.bigide/scripts/filetree.sh" C-m
   # Resize-trick: forza nvim a ridisegnare dopo startup (1col ±1 → evento resize → redraw completo)
   { sleep 5 && tmux resize-pane -t "${left_top_id}" -x 41 2>/dev/null && sleep 0.2 && tmux resize-pane -t "${left_top_id}" -x 40 2>/dev/null; } &
-  tmux send-keys -t "$right_top_id"     'clear; $HOME/.bigide/scripts/launch-claude.sh' C-m
-  tmux send-keys -t "$terminal_pane_id" 'clear' C-m
+  tmux send-keys -t "$right_top_id"     "cd '${project_path}' && clear; \$HOME/.bigide/scripts/launch-claude.sh" C-m
+  tmux send-keys -t "$terminal_pane_id" "cd '${project_path}' && clear" C-m
   tmux send-keys -t "$logs_pane_id"     'clear; $HOME/.bigide/scripts/log-viewer.sh' C-m
-  local project_path
-  project_path="$(tmux display-message -p -t "${session_name}:0.0" '#{pane_current_path}')"
   tmux send-keys -t "$gitbar_pane" "while true; do bash \$HOME/.bigide/scripts/git-bar.sh '${project_path}' 2>/dev/null; sleep 2; done" C-m
 
   # Hook: usa pane ID (%N) stabili — gli indici (0.N) cambiano se si aggiungono pane manualmente
   # terminal/logs: ciascuno = (window_width - 40 filetree - 2 bordi) / 2
   tmux set-hook -t "$session_name" client-resized \
     "run-shell 'tw=\$(tmux display-message -p \"#{window_width}\"); half=\$(( (tw - 42) / 2 )); tmux resize-pane -t ${left_top_id} -x 40 2>/dev/null; tmux resize-pane -t ${gitbar_pane} -y 1 2>/dev/null; tmux resize-pane -t ${terminal_pane_id} -x \$half 2>/dev/null; true'"
+
+  # Hook: ferma proxy LiteLLM quando la sessione BigIDE chiude
+  tmux set-hook -t "$session_name" session-closed \
+    "run-shell '$HOME/.bigide/scripts/proxy-stop.sh 2>/dev/null || true'"
 
   # Seleziona claude come pane attivo
   tmux select-pane -t "$right_top_id"

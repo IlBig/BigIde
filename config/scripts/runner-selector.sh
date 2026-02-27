@@ -147,31 +147,13 @@ _fallback_gemini_models() {
 }
 
 # ─── Genera runner config per provider non-Anthropic ─────────────────────────
+# Nota: per openai/gemini la traduzione API avviene tramite LiteLLM proxy,
+# quindi non serve piu' generare settings.json con ANTHROPIC_BASE_URL.
+# I file active-runner e active-model sono gestiti da _apply_selection.
 _create_runner_config() {
-  local provider="$1" model="$2"
-  local runner_dir="$RUNNERS_DIR/$provider"
-  mkdir -p "$runner_dir"
-
-  local token="" base_url=""
-  if [[ "$provider" == "openai" ]]; then
-    token="$(jq -r '.tokens.access_token // empty' "$HOME/.codex/auth.json" 2>/dev/null)" || true
-    base_url="https://api.openai.com/v1"
-  elif [[ "$provider" == "gemini" ]]; then
-    token="$(_get_gemini_api_key)"
-    base_url="https://generativelanguage.googleapis.com/v1beta/openai/"
-  fi
-
-  # settings.json autocontenuto (non legge da ~/.claude)
-  cat > "$runner_dir/settings.json" << JSON
-{
-  "env": {
-    "ANTHROPIC_BASE_URL": "${base_url}",
-    "ANTHROPIC_API_KEY": "${token}",
-    "ANTHROPIC_MODEL": "${model}"
-  },
-  "skipDangerousModePermissionPrompt": true
-}
-JSON
+  # No-op: il proxy LiteLLM gestisce la traduzione API.
+  # Mantenuto per compatibilita' con eventuali runner custom.
+  :
 }
 
 # ─── Stato attivo (runner + modello) ──────────────────────────────────────────
@@ -189,7 +171,7 @@ _get_active_key() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _phase1() {
-  local sel=0
+  local sel=3  # default su "Seleziona Modello"
   local n_items=4  # 3 provider + Continua
 
   # Carica status
@@ -786,12 +768,21 @@ _restart_claude_resume() {
     return 0  # Nessun pane Claude trovato, niente da riavviare
   fi
 
+  # Recupera project path salvato da create_layout
+  local project_path
+  project_path="$(cat "$BIGIDE_HOME/active-project-path" 2>/dev/null)" || project_path=""
+  project_path="${project_path/#\~/$HOME}"
+
   # respawn-pane -k: uccide il processo corrente e avvia una nuova shell
   tmux respawn-pane -k -t "$claude_pane" 2>/dev/null || true
   sleep 0.4
 
-  # Rilancia Claude con --resume nella nuova shell
-  tmux send-keys -t "$claude_pane" 'clear; $HOME/.bigide/scripts/launch-claude.sh --resume' C-m
+  # Rilancia Claude con --resume nella nuova shell, nella cartella del progetto
+  if [[ -n "$project_path" ]]; then
+    tmux send-keys -t "$claude_pane" "cd '${project_path}' && clear; \$HOME/.bigide/scripts/launch-claude.sh --resume" C-m
+  else
+    tmux send-keys -t "$claude_pane" 'clear; $HOME/.bigide/scripts/launch-claude.sh --resume' C-m
+  fi
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════

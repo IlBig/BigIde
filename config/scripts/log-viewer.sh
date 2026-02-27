@@ -19,4 +19,6 @@ clear
 printf "${_CYAN}BigIDE Logs${_R}\n"
 printf "${_DIM}────────────────────────────────────${_R}\n\n"
 
-exec tail -n 20 -f -q "$BIGIDE_LOG" 2>/dev/null
+PROXY_LOG="$HOME/.bigide/proxy/proxy.log"
+touch "$PROXY_LOG" 2>/dev/null || true
+exec tail -n 20 -f -q "$BIGIDE_LOG" "$PROXY_LOG" 2>/dev/null
