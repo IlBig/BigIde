@@ -3,10 +3,13 @@
 # prefix+c: apre NUOVA finestra Chrome a destra (50%) — sessione reale
 # Ripete: chiude finestra Chrome e ripristina Ghostty fullscreen
 
+_L() { printf '%s [EVENT] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$HOME/.bigide/logs/bigide.log" 2>/dev/null || true; }
+
 STATE_FILE="/tmp/bigide-chrome-active"
 
 if [[ -f "$STATE_FILE" ]]; then
     # Chrome split attivo → chiudi finestra e ripristina Ghostty
+    _L "devtools: Chrome close — restore Ghostty fullscreen"
     rm -f "$STATE_FILE"
     osascript <<'AS'
 -- Chiudi la finestra Chrome che abbiamo aperto
@@ -28,6 +31,7 @@ end tell
 AS
 else
     # Apri Chrome in split 50/50 (SEMPRE nuova finestra)
+    _L "devtools: Chrome open 50/50 split"
     touch "$STATE_FILE"
     rm -f /tmp/bigide-safari-active
     # Chiudi eventuale Safari split

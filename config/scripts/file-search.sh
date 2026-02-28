@@ -6,6 +6,9 @@ set -euo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
+_L() { printf '%s [EVENT] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$HOME/.bigide/logs/bigide.log" 2>/dev/null || true; }
+_L "file-search: opened in $(pwd)"
+
 RESULT_FILE="/tmp/bigide-fzf-result"
 rm -f "$RESULT_FILE"
 
@@ -40,6 +43,7 @@ selected=$(find . \
 ) || true
 
 if [[ -n "$selected" ]]; then
+  _L "file-search: selected → $selected"
   echo "$(pwd)/$selected" > "$RESULT_FILE"
   # Notifica neovim (pane 0) di aprire il file selezionato
   tmux send-keys -t ":.0" Escape

@@ -5,6 +5,9 @@ set -euo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
+_L() { printf '%s [EVENT] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$HOME/.bigide/logs/bigide.log" 2>/dev/null || true; }
+_L "git: branch-picker opened in $(pwd)"
+
 # Verifica repo git
 if ! git rev-parse --is-inside-work-tree &>/dev/null; then
   printf '\033[38;2;255;158;100m  Non è un repository git.\033[0m\n'
@@ -31,6 +34,7 @@ selected=$(git for-each-ref --format='%(refname:short)' refs/heads | \
 ) || exit 0
 
 if [[ -n "$selected" && "$selected" != "$CURRENT" ]]; then
+  _L "git: branch-switch $CURRENT → $selected"
   git checkout "$selected" 2>&1
   printf '\n\033[38;2;158;206;106m  ✔ Passato a: %s\033[0m\n' "$selected"
   sleep 1

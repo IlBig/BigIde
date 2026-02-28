@@ -84,19 +84,28 @@ create_layout() {
   # Salva project path per _restart_claude_resume e altri script
   echo "$project_path" > "$BIGIDE_HOME/active-project-path"
 
+  bide_log "PANE" "create_layout session=$session_name layout=$layout_name path=$project_path"
+  bide_log "PANE" "panes: yazi=$left_top_id claude=$right_top_id terminal=$terminal_pane_id logs=$logs_pane_id gitbar=$gitbar_pane"
+
   # Avvio strumenti — cd esplicito in ogni pane per sicurezza
+  bide_log "PANE" "send $left_top_id [yazi] ← filetree.sh"
   tmux send-keys -t "$left_top_id"      "cd '${project_path}' && clear; \$HOME/.bigide/scripts/filetree.sh" C-m
   # Resize-trick: forza nvim a ridisegnare dopo startup (1col ±1 → evento resize → redraw completo)
   { sleep 5 && tmux resize-pane -t "${left_top_id}" -x 41 2>/dev/null && sleep 0.2 && tmux resize-pane -t "${left_top_id}" -x 40 2>/dev/null; } &
+  bide_log "PANE" "send $right_top_id [claude] ← launch-claude.sh"
   tmux send-keys -t "$right_top_id"     "cd '${project_path}' && clear; \$HOME/.bigide/scripts/launch-claude.sh" C-m
+  bide_log "PANE" "send $terminal_pane_id [terminal] ← shell"
   tmux send-keys -t "$terminal_pane_id" "cd '${project_path}' && clear" C-m
+  bide_log "PANE" "send $logs_pane_id [logs] ← log-viewer.sh"
   tmux send-keys -t "$logs_pane_id"     'clear; $HOME/.bigide/scripts/log-viewer.sh' C-m
+  bide_log "PANE" "send $gitbar_pane [gitbar] ← git-bar.sh loop"
   tmux send-keys -t "$gitbar_pane" "while true; do bash \$HOME/.bigide/scripts/git-bar.sh '${project_path}' 2>/dev/null; sleep 2; done" C-m
 
   # Hook: usa pane ID (%N) stabili — gli indici (0.N) cambiano se si aggiungono pane manualmente
   # terminal/logs: ciascuno = (window_width - 40 filetree - 2 bordi) / 2
   tmux set-hook -t "$session_name" client-resized \
     "run-shell 'tw=\$(tmux display-message -p \"#{window_width}\"); half=\$(( (tw - 42) / 2 )); tmux resize-pane -t ${left_top_id} -x 40 2>/dev/null; tmux resize-pane -t ${gitbar_pane} -y 1 2>/dev/null; tmux resize-pane -t ${terminal_pane_id} -x \$half 2>/dev/null; true'"
+  bide_log "HOOK" "registered client-resized → resize panes [session=$session_name left=$left_top_id term=$terminal_pane_id gitbar=$gitbar_pane]"
 
   # Seleziona claude come pane attivo
   tmux select-pane -t "$right_top_id"

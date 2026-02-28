@@ -207,6 +207,7 @@ _apply_selection() {
 
   mkdir -p "$BIGIDE_HOME"
   echo "$runner" > "$BIGIDE_HOME/active-runner"
+  printf '%s [EVENT] provider-change → %s (%s)\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$runner" "$display" >> "$BIGIDE_HOME/logs/bigide.log" 2>/dev/null || true
 
   _restart_provider
 

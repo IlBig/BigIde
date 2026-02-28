@@ -6,6 +6,8 @@ set -euo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
+printf '%s [EVENT] git: lazygit opened in %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$(pwd)" >> "$HOME/.bigide/logs/bigide.log" 2>/dev/null || true
+
 if ! command -v lazygit &>/dev/null; then
   printf '\n\033[38;2;255;158;100m  lazygit non trovato.\033[0m\n'
   printf '\033[38;2;86;95;137m  Installa con: brew install lazygit\033[0m\n\n'

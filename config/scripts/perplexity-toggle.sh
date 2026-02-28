@@ -2,6 +2,8 @@
 # BigIDE — Toggle pannello Perplexity
 # prefix+p: apre split 50/50 su Claude Code, chiude se già aperto
 
+_L() { printf '%s [EVENT] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$HOME/.bigide/logs/bigide.log" 2>/dev/null || true; }
+
 PANE_ID_FILE="$HOME/.bigide/perplexity/.pane_id"
 
 # ── Cerca se il pannello Perplexity esiste già ────────────────────────────────
@@ -18,6 +20,7 @@ fi
 
 # ── Toggle ────────────────────────────────────────────────────────────────────
 if [[ -n "$PERP_PANE" ]]; then
+  _L "perplexity: OFF — kill pane $PERP_PANE"
   tmux kill-pane -t "$PERP_PANE"
   rm -f "$PANE_ID_FILE"
   # Rimuovi hook e ripristina bordo standard
@@ -38,6 +41,7 @@ else
     CLAUDE_PANE=$(tmux display-message -p '#{pane_id}')
 
   NEW_PANE=$(tmux split-window -h -p 50 -t "$CLAUDE_PANE" -P -F '#{pane_id}')
+  _L "perplexity: ON — new pane $NEW_PANE split from claude $CLAUDE_PANE"
 
   # Salva ID per il prossimo toggle
   mkdir -p "$(dirname "$PANE_ID_FILE")"
