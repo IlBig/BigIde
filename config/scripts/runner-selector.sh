@@ -43,6 +43,12 @@ _detect_size() {
 
 # ─── Provider attivo ─────────────────────────────────────────────────────────
 _get_active_runner() {
+  # Per-window: leggi da tmux window option se disponibile
+  if [[ -n "${BIGIDE_WINDOW:-}" ]]; then
+    local wr
+    wr="$(tmux show-option -wqv -t "$BIGIDE_WINDOW" @bigide_runner 2>/dev/null)" || true
+    [[ -n "$wr" ]] && { echo "$wr"; return 0; }
+  fi
   cat "$BIGIDE_HOME/active-runner" 2>/dev/null || echo "anthropic"
 }
 
@@ -206,7 +212,22 @@ _apply_selection() {
   local runner="$1" display="$2"
 
   mkdir -p "$BIGIDE_HOME"
+  # Globale (persistenza e fallback)
   echo "$runner" > "$BIGIDE_HOME/active-runner"
+
+  # Per-window: scrivi runner + display name sul window corrente
+  if [[ -n "${BIGIDE_WINDOW:-}" ]]; then
+    tmux set-option -w -t "$BIGIDE_WINDOW" @bigide_runner "$runner" 2>/dev/null || true
+    local disp_name
+    case "$runner" in
+      anthropic) disp_name="claude" ;;
+      openai)    disp_name="codex" ;;
+      gemini)    disp_name="gemini" ;;
+      *)         disp_name="$runner" ;;
+    esac
+    tmux set-option -w -t "$BIGIDE_WINDOW" @bigide_runner_display "$disp_name" 2>/dev/null || true
+  fi
+
   printf '%s [EVENT] provider-change → %s (%s)\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$runner" "$display" >> "$BIGIDE_HOME/logs/bigide.log" 2>/dev/null || true
 
   _restart_provider
@@ -226,13 +247,26 @@ _apply_selection() {
 
 _restart_provider() {
   local claude_pane
-  claude_pane=$(tmux list-panes -a -F '#{pane_id} #{@bigide_pane_type}' 2>/dev/null \
-    | awk '$2 == "claude" {print $1; exit}')
+
+  # Scope al window corrente se disponibile, altrimenti fallback globale
+  if [[ -n "${BIGIDE_WINDOW:-}" ]]; then
+    claude_pane=$(tmux list-panes -t "$BIGIDE_WINDOW" -F '#{pane_id} #{@bigide_pane_type}' 2>/dev/null \
+      | awk '$2 == "claude" {print $1; exit}')
+  else
+    claude_pane=$(tmux list-panes -a -F '#{pane_id} #{@bigide_pane_type}' 2>/dev/null \
+      | awk '$2 == "claude" {print $1; exit}')
+  fi
 
   [[ -z "$claude_pane" ]] && return 0
 
-  local project_path
-  project_path="$(cat "$BIGIDE_HOME/active-project-path" 2>/dev/null)" || project_path=""
+  # Project path: per-window → fallback globale
+  local project_path=""
+  if [[ -n "${BIGIDE_WINDOW:-}" ]]; then
+    project_path="$(tmux show-option -wqv -t "$BIGIDE_WINDOW" @bigide_project_path 2>/dev/null)" || true
+  fi
+  if [[ -z "$project_path" ]]; then
+    project_path="$(cat "$BIGIDE_HOME/active-project-path" 2>/dev/null)" || project_path=""
+  fi
   project_path="${project_path/#\~/$HOME}"
 
   tmux respawn-pane -k -t "$claude_pane" 2>/dev/null || true

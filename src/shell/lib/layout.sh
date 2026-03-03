@@ -84,6 +84,23 @@ create_layout() {
   # Salva project path per _restart_claude_resume e altri script
   echo "$project_path" > "$BIGIDE_HOME/active-project-path"
 
+  # ── Per-window state: runner + project path ──────────────────────────────────
+  local win_id
+  win_id="$(tmux display-message -p -t "$session_name":0 '#{window_id}')"
+  tmux set-option -w -t "$win_id" @bigide_project_path "$project_path"
+  local default_runner
+  default_runner="$(cat "$BIGIDE_HOME/active-runner" 2>/dev/null)" || default_runner="anthropic"
+  [[ -z "$default_runner" ]] && default_runner="anthropic"
+  tmux set-option -w -t "$win_id" @bigide_runner "$default_runner"
+  local display_name
+  case "$default_runner" in
+    anthropic) display_name="claude" ;;
+    openai)    display_name="codex" ;;
+    gemini)    display_name="gemini" ;;
+    *)         display_name="$default_runner" ;;
+  esac
+  tmux set-option -w -t "$win_id" @bigide_runner_display "$display_name"
+
   bide_log "PANE" "create_layout session=$session_name layout=$layout_name path=$project_path"
   bide_log "PANE" "panes: yazi=$left_top_id claude=$right_top_id terminal=$terminal_pane_id logs=$logs_pane_id gitbar=$gitbar_pane"
 

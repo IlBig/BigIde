@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # BigIDE — Command Palette (stile VSCode)
-# prefix+a: tasto diretto esegue subito, ↑↓+Enter per navigare
+# C-a: apre subito, tasto diretto esegue, Esc chiude BigIDE
 set -euo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
@@ -9,6 +9,9 @@ BIGIDE_HOME="${BIGIDE_HOME:-$HOME/.bigide}"
 _S="$HOME/.bigide/scripts"
 
 _L() { printf '%s [EVENT] palette: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$BIGIDE_HOME/logs/bigide.log" 2>/dev/null || true; }
+
+# Sessione BigIDE — passata via env dal binding tmux, fallback display-message
+_SESSION="${BIGIDE_SESSION:-$(tmux display-message -p '#{session_name}' 2>/dev/null || echo '')}"
 
 # ─── Auto-reload ─────────────────────────────────────────────────────────────
 _REPO_ROOT="$(cat "$BIGIDE_HOME/.repo_root" 2>/dev/null)" || true
@@ -45,6 +48,8 @@ _ITEMS=(
   "m|AI Provider|exec|$_S/runner-selector.sh"
   "g|Lazygit|exec|$_S/git-lazygit.sh"
   "b|Git Branch|exec|$_S/git-branch.sh"
+  "z|Zoom Pannello|tmux|zoom"
+  "?|Help|exec|$_S/which-key.sh"
 )
 _N=${#_ITEMS[@]}
 
@@ -81,8 +86,20 @@ _execute() {
       exit 0
       ;;
     tmux)
-      # File tree toggle inline
-      tmux run-shell 'pw=$(tmux display-message -p -t ":.0" "#{pane_width}"); if [ "$pw" -le 3 ]; then tmux resize-pane -t ":.0" -x 40; else tmux resize-pane -t ":.0" -x 1; fi'
+      case "$target" in
+        filetree)
+          local _yp=""
+          if [[ -n "${BIGIDE_WINDOW:-}" ]]; then
+            _yp=$(tmux list-panes -t "$BIGIDE_WINDOW" -F '#{pane_id} #{@bigide_pane_type}' 2>/dev/null \
+              | awk '$2=="yazi"{print $1;exit}')
+          fi
+          [[ -z "$_yp" ]] && _yp=":.0"
+          tmux run-shell "pw=\$(tmux display-message -p -t '$_yp' '#{pane_width}'); if [ \"\$pw\" -le 3 ]; then tmux resize-pane -t '$_yp' -x 40; else tmux resize-pane -t '$_yp' -x 1; fi"
+          ;;
+        zoom)
+          tmux resize-pane -Z
+          ;;
+      esac
       exit 0
       ;;
   esac
@@ -153,7 +170,7 @@ _draw() {
   _goto "$r" "$c"; printf '%s│%*s│%s' "$_C_FRAME" "$w" "" "$_C_RESET"; (( r++ ))
 
   # Footer
-  local hint="↑↓ naviga  tasto diretto  Esc chiudi"
+  local hint="↑↓ naviga  tasto esegue  Esc chiudi  q esci"
   local hpad=$(( (w - ${#hint}) / 2 ))
   _goto "$r" "$c"
   printf '%s│%*s%s%s%*s%s│%s' \
@@ -186,7 +203,8 @@ _main() {
             B) (( sel = (sel + 1) % _N )); _draw "$sel" ;;        # ↓
           esac
         else
-          tput cnorm 2>/dev/null || true; exit 0  # Esc
+          # Esc → chiudi palette
+          tput cnorm 2>/dev/null || true; exit 0
         fi
         ;;
       k) (( sel = (sel - 1 + _N) % _N )); _draw "$sel" ;;
@@ -195,7 +213,12 @@ _main() {
       "")  # Enter
         _execute "$sel"
         ;;
-      q) tput cnorm 2>/dev/null || true; exit 0 ;;
+      q)
+        # q → chiudi BigIDE (kill session)
+        tput cnorm 2>/dev/null || true
+        tmux kill-session -t "$_SESSION" 2>/dev/null || tmux kill-session 2>/dev/null || true
+        exit 0
+        ;;
       *)
         # Tasto diretto: trova e lancia subito
         local i

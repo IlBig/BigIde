@@ -10,8 +10,8 @@ PANE_ID_FILE="$HOME/.bigide/perplexity/.pane_id"
 PERP_PANE=""
 if [[ -f "$PANE_ID_FILE" ]]; then
   stored="$(cat "$PANE_ID_FILE")"
-  # Verifica che il pane sia ancora vivo
-  if tmux list-panes -a -F '#{pane_id}' 2>/dev/null | grep -qF "$stored"; then
+  # Verifica che il pane sia ancora vivo (scope alla sessione corrente)
+  if tmux list-panes -s -F '#{pane_id}' 2>/dev/null | grep -qF "$stored"; then
     PERP_PANE="$stored"
   else
     rm -f "$PANE_ID_FILE"
@@ -30,13 +30,14 @@ if [[ -n "$PERP_PANE" ]]; then
 else
   SESSION=$(tmux display-message -p '#{session_name}')
 
-  # Trova Claude Code per tag (@bigide_pane_type claude, impostato con -p in layout.sh)
-  CLAUDE_PANE=$(tmux list-panes -t "$SESSION" -F '#{pane_id} #{@bigide_pane_type}' 2>/dev/null \
+  # Trova Claude Code per tag nel window corrente
+  CLAUDE_PANE=$(tmux list-panes -F '#{pane_id} #{@bigide_pane_type}' 2>/dev/null \
     | awk '$2=="claude"{print $1}' | head -1)
 
-  # Fallback: indice .1 = Claude nel layout default (yazi=.0, claude=.1)
+  # Fallback: cerca nella sessione
   [[ -z "$CLAUDE_PANE" ]] && \
-    CLAUDE_PANE=$(tmux display-message -p -t "${SESSION}:0.1" '#{pane_id}' 2>/dev/null)
+    CLAUDE_PANE=$(tmux list-panes -t "$SESSION" -F '#{pane_id} #{@bigide_pane_type}' 2>/dev/null \
+      | awk '$2=="claude"{print $1}' | head -1)
   [[ -z "$CLAUDE_PANE" ]] && \
     CLAUDE_PANE=$(tmux display-message -p '#{pane_id}')
 
