@@ -16,9 +16,13 @@ ACTIVE_RUNNER_FILE="$BIGIDE_HOME/active-runner"
 # ── Runner helper ─────────────────────────────────────────────────────────────
 
 get_active_runner() {
-  # Per-window: prova tmux window option (senza -t = window corrente del pane)
+  # Per-window: usa -t esplicito se BIGIDE_WINDOW è disponibile (evita ambiguità multi-tab)
   local wr
-  wr="$(tmux show-option -wqv @bigide_runner 2>/dev/null)" || true
+  if [[ -n "${BIGIDE_WINDOW:-}" ]]; then
+    wr="$(tmux show-option -wqv -t "$BIGIDE_WINDOW" @bigide_runner 2>/dev/null)" || true
+  else
+    wr="$(tmux show-option -wqv @bigide_runner 2>/dev/null)" || true
+  fi
   if [[ -n "$wr" ]]; then
     echo "$wr"
     return 0

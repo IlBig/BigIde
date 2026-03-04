@@ -112,7 +112,7 @@ create_layout() {
   bide_log "PANE" "send $right_top_id [claude] ← launch-claude.sh"
   tmux send-keys -t "$right_top_id"     "cd '${project_path}' && clear; \$HOME/.bigide/scripts/launch-claude.sh" C-m
   bide_log "PANE" "send $terminal_pane_id [terminal] ← shell"
-  tmux send-keys -t "$terminal_pane_id" "cd '${project_path}' && clear" C-m
+  tmux send-keys -t "$terminal_pane_id" "cd '${project_path}' && clear && exec zsh" C-m
   bide_log "PANE" "send $logs_pane_id [logs] ← log-viewer.sh"
   tmux send-keys -t "$logs_pane_id"     'clear; $HOME/.bigide/scripts/log-viewer.sh' C-m
   bide_log "PANE" "send $gitbar_pane [gitbar] ← git-bar.sh loop"

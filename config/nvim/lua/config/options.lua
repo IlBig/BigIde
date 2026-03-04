@@ -4,10 +4,11 @@ vim.opt.mouse        = "a"
 vim.opt.number       = false
 vim.opt.relativenumber = false
 
--- UI minimale per il pannello file-tree (nessuna statusline/tabline)
+-- UI minimale per il pannello file-tree (nessuna statusline/tabline/winbar)
 vim.opt.laststatus   = 0
 vim.opt.showtabline  = 0
 vim.opt.cmdheight    = 0
+vim.opt.winbar       = ""   -- impedisce a neo-tree di mostrare il path
 
 -- Rimuovi readonly/nomodifiable da buffer file normali (neo-tree li imposta sui propri buffer,
 -- ma possono propagarsi quando si apre un file nella stessa finestra)

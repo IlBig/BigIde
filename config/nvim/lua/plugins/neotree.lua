@@ -592,6 +592,8 @@ return {
     use_default_mappings = false,
     enable_git_status    = true,
     enable_diagnostics   = false,
+    hide_root_node       = true,
+    source_selector      = { winbar = false, statusline = false },
 
     renderers = {
       file = {

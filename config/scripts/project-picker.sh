@@ -133,9 +133,9 @@ _open_project_tab() {
   # Avvio strumenti — tutti puntano al progetto selezionato
   tmux send-keys -t "$left_top_id"      "cd '${project_path}' && clear && \$HOME/.bigide/scripts/filetree.sh" C-m
   { sleep 5 && tmux resize-pane -t "$left_top_id" -x 41 2>/dev/null && sleep 0.2 && tmux resize-pane -t "$left_top_id" -x 40 2>/dev/null; } &
-  tmux send-keys -t "$right_top_id"     "cd '${project_path}' && clear && \$HOME/.bigide/scripts/launch-claude.sh" C-m
-  tmux send-keys -t "$terminal_pane_id" "cd '${project_path}' && clear && zsh" C-m
-  tmux send-keys -t "$logs_pane_id"     "cd '${project_path}' && clear && zsh" C-m
+  tmux send-keys -t "$right_top_id"     "cd '${project_path}' && clear && BIGIDE_WINDOW='${win_id}' \$HOME/.bigide/scripts/launch-claude.sh" C-m
+  tmux send-keys -t "$terminal_pane_id" "cd '${project_path}' && clear && exec zsh" C-m
+  tmux send-keys -t "$logs_pane_id"     "clear; \$HOME/.bigide/scripts/log-viewer.sh" C-m
   tmux send-keys -t "$gitbar_pane"      "while true; do bash \$HOME/.bigide/scripts/git-bar.sh '${project_path}' 2>/dev/null; sleep 2; done" C-m
 
   # Resize hook per il nuovo window

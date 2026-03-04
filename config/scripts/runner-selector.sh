@@ -7,12 +7,17 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 BIGIDE_HOME="${BIGIDE_HOME:-$HOME/.bigide}"
 
+# ─── ERR trap per debug crash ─────────────────────────────────────────────────
+trap 'printf "%s [ERR] runner-selector crash: line=%d cmd=%s\n" "$(date +%Y-%m-%d\ %H:%M:%S)" "$LINENO" "$BASH_COMMAND" >> "$BIGIDE_HOME/logs/bigide.log" 2>/dev/null || true' ERR
+
 # ─── Auto-reload da repo ─────────────────────────────────────────────────────
 _REPO_ROOT="$(cat "$BIGIDE_HOME/.repo_root" 2>/dev/null)" || true
 if [[ -n "$_REPO_ROOT" ]]; then
   _REPO_SCRIPT="$_REPO_ROOT/config/scripts/runner-selector.sh"
   _SELF="${BASH_SOURCE[0]}"
-  if [[ -f "$_REPO_SCRIPT" && "$_SELF" != "$_REPO_SCRIPT" && "$_REPO_SCRIPT" -nt "$_SELF" ]]; then
+  # Esegui sempre dal repo — il check -nt non funziona perché setup-runtime.sh
+  # copia i file e aggiorna il mtime dell'installato rendendolo sempre "più recente"
+  if [[ -f "$_REPO_SCRIPT" && "$_SELF" != "$_REPO_SCRIPT" ]]; then
     exec bash "$_REPO_SCRIPT" "$@"
   fi
   BIGIDE_REPO_ROOT="$_REPO_ROOT"
@@ -246,6 +251,10 @@ _apply_selection() {
 # ═══════════════════════════════════════════════════════════════════════════════
 
 _restart_provider() {
+  printf '%s [DEBUG] _restart_provider: CALLED win=%s\n' \
+    "$(date '+%Y-%m-%d %H:%M:%S')" "${BIGIDE_WINDOW:-}" \
+    >> "$BIGIDE_HOME/logs/bigide.log" 2>/dev/null || true
+
   local claude_pane
 
   # Scope al window corrente se disponibile, altrimenti fallback globale
@@ -257,26 +266,52 @@ _restart_provider() {
       | awk '$2 == "claude" {print $1; exit}')
   fi
 
-  [[ -z "$claude_pane" ]] && return 0
+  # Log diagnostico: mostra tutti i pane con il loro tipo
+  local _pane_dump
+  _pane_dump="$(tmux list-panes -t "${BIGIDE_WINDOW:-}" -F '#{pane_id}:#{@bigide_pane_type}' 2>/dev/null | tr '\n' ' ')" || _pane_dump="ERR"
+  printf '%s [DEBUG] restart_provider: window=%s panes=[%s] found=%s\n' \
+    "$(date '+%Y-%m-%d %H:%M:%S')" "${BIGIDE_WINDOW:-}" "$_pane_dump" "$claude_pane" \
+    >> "$BIGIDE_HOME/logs/bigide.log" 2>/dev/null || true
+
+  if [[ -z "$claude_pane" ]]; then
+    printf '%s [WARN] restart_provider: nessun pane claude (window=%s)\n' \
+      "$(date '+%Y-%m-%d %H:%M:%S')" "${BIGIDE_WINDOW:-}" >> "$BIGIDE_HOME/logs/bigide.log" 2>/dev/null || true
+    return 0
+  fi
 
   # Project path: per-window → fallback globale
   local project_path=""
   if [[ -n "${BIGIDE_WINDOW:-}" ]]; then
     project_path="$(tmux show-option -wqv -t "$BIGIDE_WINDOW" @bigide_project_path 2>/dev/null)" || true
   fi
-  if [[ -z "$project_path" ]]; then
-    project_path="$(cat "$BIGIDE_HOME/active-project-path" 2>/dev/null)" || project_path=""
-  fi
+  [[ -z "$project_path" ]] && project_path="$(cat "$BIGIDE_HOME/active-project-path" 2>/dev/null)" || true
   project_path="${project_path/#\~/$HOME}"
 
-  tmux respawn-pane -k -t "$claude_pane" 2>/dev/null || true
-  sleep 0.4
+  printf '%s [PANE] restart_provider: pane=%s path=%s win=%s\n' \
+    "$(date '+%Y-%m-%d %H:%M:%S')" "$claude_pane" "$project_path" "${BIGIDE_WINDOW:-}" \
+    >> "$BIGIDE_HOME/logs/bigide.log" 2>/dev/null || true
 
-  if [[ -n "$project_path" ]]; then
-    tmux send-keys -t "$claude_pane" "cd '${project_path}' && clear; \$HOME/.bigide/scripts/launch-claude.sh" C-m
-  else
-    tmux send-keys -t "$claude_pane" 'clear; $HOME/.bigide/scripts/launch-claude.sh' C-m
-  fi
+  # Script temporaneo: evita race condition tra respawn-pane e send-keys
+  # (la shell impiega 1-2s ad inizializzare; send-keys arriverebbe nel vuoto)
+  mkdir -p "$BIGIDE_HOME/tmp"
+  local tmpscript
+  tmpscript="$(mktemp "$BIGIDE_HOME/tmp/restart-XXXXXX.sh")"
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf 'export BIGIDE_WINDOW=%q\n' "${BIGIDE_WINDOW:-}"
+    [[ -n "$project_path" ]] && printf 'cd %q\n' "$project_path"
+    printf 'clear\n'
+    printf 'exec %q\n' "$HOME/.bigide/scripts/launch-claude.sh"
+  } > "$tmpscript"
+  chmod +x "$tmpscript"
+
+  # respawn-pane con comando esplicito: nessun send-keys, nessun sleep
+  local _respawn_out
+  _respawn_out="$(tmux respawn-pane -k -t "$claude_pane" \
+    "bash $(printf '%q' "$tmpscript"); rm -f $(printf '%q' "$tmpscript"); exec zsh -l" 2>&1)"
+  printf '%s [PANE] respawn-pane exit=%d out=%s script=%s\n' \
+    "$(date '+%Y-%m-%d %H:%M:%S')" "$?" "$_respawn_out" "$tmpscript" \
+    >> "$BIGIDE_HOME/logs/bigide.log" 2>/dev/null || true
 }
 
 # ═══════════════════════════════════════════════════════════════════════════════
