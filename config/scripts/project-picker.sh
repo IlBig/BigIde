@@ -7,6 +7,7 @@ set -euo pipefail
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 BIGIDE_HOME="${BIGIDE_HOME:-$HOME/.bigide}"
+_L() { printf '%s [EVENT] project-picker: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$BIGIDE_HOME/logs/bigide.log" 2>/dev/null || true; }
 
 # ─── Auto-reload: se il repo ha una versione più recente, esegui quella ─────
 _REPO_ROOT="$(cat "$BIGIDE_HOME/.repo_root" 2>/dev/null)" || true
@@ -24,6 +25,12 @@ fi
 # ─── Sessione e directory corrente ──────────────────────────────────────────
 CURRENT_SESSION="$(tmux display-message -p '#S')"
 SESSION_PATH="$(tmux display-message -p '#{session_path}' 2>/dev/null)" || SESSION_PATH="$HOME"
+SESSION_PATH="${SESSION_PATH/#\~/$HOME}"
+# Se session_path è $HOME, prova active-project-path
+if [[ "$SESSION_PATH" == "$HOME" ]]; then
+  _alt="$(cat "$HOME/.bigide/active-project-path" 2>/dev/null)" || true
+  [[ -n "$_alt" && -d "$_alt" ]] && SESSION_PATH="$_alt"
+fi
 CURRENT_DIR="$(dirname "$SESSION_PATH")"
 [[ -d "$CURRENT_DIR" ]] || CURRENT_DIR="$HOME"
 
@@ -106,17 +113,42 @@ _open_project_tab() {
   tmux set-option -p -t "$logs_pane_id"     @bigide_pane_type "logs"
   tmux set-option -p -t "$gitbar_pane"      @bigide_pane_type "gitbar"
 
+  # ── Per-window state: runner + project path ──────────────────────────────────
+  local win_id
+  win_id="$(tmux display-message -p -t "${CURRENT_SESSION}:=${project_name}" '#{window_id}')"
+  tmux set-option -w -t "$win_id" @bigide_project_path "$project_path"
+  local default_runner
+  default_runner="$(cat "$BIGIDE_HOME/active-runner" 2>/dev/null)" || default_runner="anthropic"
+  [[ -z "$default_runner" ]] && default_runner="anthropic"
+  tmux set-option -w -t "$win_id" @bigide_runner "$default_runner"
+  local display_name
+  case "$default_runner" in
+    anthropic) display_name="claude" ;;
+    openai)    display_name="codex" ;;
+    gemini)    display_name="gemini" ;;
+    *)         display_name="$default_runner" ;;
+  esac
+  tmux set-option -w -t "$win_id" @bigide_runner_display "$display_name"
+
   # Avvio strumenti — tutti puntano al progetto selezionato
   tmux send-keys -t "$left_top_id"      "cd '${project_path}' && clear && \$HOME/.bigide/scripts/filetree.sh" C-m
   { sleep 5 && tmux resize-pane -t "$left_top_id" -x 41 2>/dev/null && sleep 0.2 && tmux resize-pane -t "$left_top_id" -x 40 2>/dev/null; } &
-  tmux send-keys -t "$right_top_id"     "cd '${project_path}' && clear && \$HOME/.bigide/scripts/launch-claude.sh" C-m
-  tmux send-keys -t "$terminal_pane_id" "cd '${project_path}' && clear && zsh" C-m
-  tmux send-keys -t "$logs_pane_id"     "cd '${project_path}' && clear && zsh" C-m
+  tmux send-keys -t "$right_top_id"     "cd '${project_path}' && clear && BIGIDE_WINDOW='${win_id}' \$HOME/.bigide/scripts/launch-claude.sh" C-m
+  tmux send-keys -t "$terminal_pane_id" "cd '${project_path}' && clear && exec zsh" C-m
+  tmux send-keys -t "$logs_pane_id"     "clear; \$HOME/.bigide/scripts/log-viewer.sh" C-m
   tmux send-keys -t "$gitbar_pane"      "while true; do bash \$HOME/.bigide/scripts/git-bar.sh '${project_path}' 2>/dev/null; sleep 2; done" C-m
 
   # Resize hook per il nuovo window
   tmux set-hook -t "$CURRENT_SESSION" client-resized \
     "run-shell 'tw=\$(tmux display-message -p \"#{window_width}\"); half=\$(( (tw - 42) / 2 )); tmux resize-pane -t ${left_top_id} -x 40 2>/dev/null; tmux resize-pane -t ${gitbar_pane} -y 1 2>/dev/null; tmux resize-pane -t ${terminal_pane_id} -x \$half 2>/dev/null; true'"
+
+  # Resize esplicito — allinea alle stesse dimensioni del layout principale
+  local tw
+  tw="$(tmux display-message -p -t "${CURRENT_SESSION}:=${project_name}" '#{window_width}' 2>/dev/null)" || tw=160
+  local half=$(( (tw - 42) / 2 ))
+  tmux resize-pane -t "$left_top_id" -x 40 2>/dev/null || true
+  tmux resize-pane -t "$gitbar_pane" -y 1 2>/dev/null || true
+  tmux resize-pane -t "$terminal_pane_id" -x "$half" 2>/dev/null || true
 
   # Seleziona claude come pane attivo
   tmux select-pane -t "$right_top_id"
@@ -164,18 +196,35 @@ navigate() {
       --ansi \
     ) || return 0
 
-    # Parsing output fzf con --expect: riga 1 = tasto, riga 2 = selezione
+    # Parsing output fzf con --expect: riga 1 = tasto, riga 2+ = selezione
     local key line
-    key="$(head -1 <<< "$selected")"
-    line="$(tail -1 <<< "$selected")"
+    IFS= read -r key <<< "$selected"
+    line="$(tail -n +2 <<< "$selected")"
 
+    _L "fzf: key=[$key] line=[$line]"
     [[ -z "$line" ]] && continue
 
     # Rimuovi codici ANSI per il matching
     local clean
     clean="$(sed $'s/\033\\[[0-9;]*m//g' <<< "$line")"
 
-    # ─── Nuova cartella ─────────────────────────────────────────────
+    # ─── Estrai nome cartella (rimuovi indicatore ● e spazi) ────────
+    local folder_name
+    folder_name="$(echo "$clean" | sed 's/^[●+ ]*//' | xargs)"
+
+    # ─── Ctrl-O → apri progetto (check PRIMA del contenuto) ────────
+    if [[ "$key" == "ctrl-o" ]]; then
+      local target="$dir/$folder_name"
+      # Se il target selezionato non è una cartella valida, apri $dir (la cartella corrente)
+      if [[ ! -d "$target" ]]; then
+        target="$dir"
+      fi
+      _L "ctrl-o: opening [$target] (session=$CURRENT_SESSION)"
+      _open_project_tab "$target" 2>>"$BIGIDE_HOME/logs/bigide.log" || _L "ERROR: _open_project_tab failed: $?"
+      return 0
+    fi
+
+    # ─── Enter: gestisci in base al contenuto ───────────────────────
     if [[ "$clean" == *"Nuova cartella"* ]]; then
       local new_name=""
       printf "${BLUE}"
@@ -187,27 +236,13 @@ navigate() {
       continue
     fi
 
-    # ─── Cartella superiore ─────────────────────────────────────────
     if [[ "$clean" == *"Cartella superiore"* ]]; then
       dir="$(dirname "$dir")"
       continue
     fi
 
-    # ─── Estrai nome cartella (rimuovi indicatore e spazi) ──────────
-    local folder_name
-    folder_name="$(echo "$clean" | sed 's/^[● ]*//' | xargs)"
     local target="$dir/$folder_name"
-
-    if [[ ! -d "$target" ]]; then
-      continue
-    fi
-
-    if [[ "$key" == "ctrl-o" ]]; then
-      # Ctrl-O → apri come nuovo tab BigIDE
-      _open_project_tab "$target"
-      return 0
-    else
-      # Enter → entra nella directory
+    if [[ -d "$target" ]]; then
       dir="$target"
     fi
   done

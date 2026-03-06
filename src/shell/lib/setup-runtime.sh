@@ -42,11 +42,11 @@ init_runtime() {
   # Scripts (sovrascrivi e chmod)
   cp -r "$BIGIDE_REPO_ROOT/src/shell/scripts/" "$BIGIDE_HOME/scripts/"
   # config/scripts/ ha precedenza su src/shell/scripts/ — copia tutti con sostituzione placeholder
-  for script in "$BIGIDE_REPO_ROOT/config/scripts/"*.sh "$BIGIDE_REPO_ROOT/config/scripts/"*.lua; do
+  for script in "$BIGIDE_REPO_ROOT/config/scripts/"*.sh "$BIGIDE_REPO_ROOT/config/scripts/"*.lua "$BIGIDE_REPO_ROOT/config/scripts/"*.mjs; do
     [[ -f "$script" ]] || continue
     sed "s#__BIGIDE_REPO_ROOT__#$BIGIDE_REPO_ROOT#g" "$script" > "$BIGIDE_HOME/scripts/$(basename "$script")"
   done
-  chmod +x "$BIGIDE_HOME/scripts"/*.sh 2>/dev/null || true
+  chmod +x "$BIGIDE_HOME/scripts"/*.sh "$BIGIDE_HOME/scripts"/*.mjs 2>/dev/null || true
 
   # Moduli Python (config/scripts/perplexity/)
   cp -r "$BIGIDE_REPO_ROOT/config/scripts/perplexity/" "$BIGIDE_HOME/scripts/perplexity/"
@@ -167,6 +167,9 @@ _create_app_bundle() {
   local app_dir="$HOME/Applications/BigIDE.app"
   local macos_dir="$app_dir/Contents/MacOS"
   local ghostty_bin="/Applications/Ghostty.app/Contents/MacOS/ghostty"
+
+  # Skip se il bundle esiste già
+  [[ -f "$macos_dir/BigIDE" ]] && return 0
 
   mkdir -p "$macos_dir"
 

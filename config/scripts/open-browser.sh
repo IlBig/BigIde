@@ -3,10 +3,13 @@
 # prefix+s: apre NUOVA finestra Safari a destra (50%) — sessione reale
 # Ripete: chiude finestra Safari e ripristina Ghostty fullscreen
 
+_L() { printf '%s [EVENT] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$HOME/.bigide/logs/bigide.log" 2>/dev/null || true; }
+
 STATE_FILE="/tmp/bigide-safari-active"
 
 if [[ -f "$STATE_FILE" ]]; then
     # Safari split attivo → chiudi finestra e ripristina Ghostty
+    _L "browser: Safari close — restore Ghostty fullscreen"
     rm -f "$STATE_FILE"
     osascript <<'AS'
 -- Chiudi la finestra Safari che abbiamo aperto
@@ -28,6 +31,7 @@ end tell
 AS
 else
     # Apri Safari in split 50/50 (SEMPRE nuova finestra)
+    _L "browser: Safari open 50/50 split"
     touch "$STATE_FILE"
     rm -f /tmp/bigide-chrome-active
     # Chiudi eventuale Chrome split

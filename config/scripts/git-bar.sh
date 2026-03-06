@@ -4,7 +4,7 @@
 
 PROJECT_DIR="${1:-$PWD}"
 
-printf '\033[?25l'   # nasconde cursore (no tput, funziona in 1 riga)
+printf '\033[?25l\033[2J\033[H'   # nasconde cursore + pulisce il prompt zsh iniziale
 stty -echo 2>/dev/null || true
 
 build_git() {

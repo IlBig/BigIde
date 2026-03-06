@@ -6,6 +6,27 @@ set -euo pipefail
 
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
+_L() { printf '%s [EVENT] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$HOME/.bigide/logs/bigide.log" 2>/dev/null || true; }
+
+# Assicura cwd = root progetto (il popup potrebbe non ereditarlo)
+# Per-window: prova @bigide_project_path dal window corrente
+_PROJECT=""
+if [[ -n "${BIGIDE_WINDOW:-}" ]]; then
+  _PROJECT="$(tmux show-option -wqv -t "$BIGIDE_WINDOW" @bigide_project_path 2>/dev/null)" || true
+fi
+# Fallback: session_path
+if [[ -z "$_PROJECT" || "$_PROJECT" == "$HOME" ]]; then
+  _PROJECT="$(tmux display-message -p '#{session_path}' 2>/dev/null)" || true
+  _PROJECT="${_PROJECT/#\~/$HOME}"
+fi
+# Fallback: file globale
+if [[ -z "$_PROJECT" || "$_PROJECT" == "$HOME" ]]; then
+  _PROJECT="$(cat "$HOME/.bigide/active-project-path" 2>/dev/null)" || true
+fi
+[[ -n "$_PROJECT" && -d "$_PROJECT" ]] && cd "$_PROJECT" 2>/dev/null || true
+
+_L "file-search: opened in $(pwd)"
+
 RESULT_FILE="/tmp/bigide-fzf-result"
 rm -f "$RESULT_FILE"
 
@@ -40,8 +61,15 @@ selected=$(find . \
 ) || true
 
 if [[ -n "$selected" ]]; then
+  _L "file-search: selected → $selected"
   echo "$(pwd)/$selected" > "$RESULT_FILE"
-  # Notifica neovim (pane 0) di aprire il file selezionato
-  tmux send-keys -t ":.0" Escape
-  tmux send-keys -t ":.0" ":lua BigideOpenSearch()" Enter
+  # Notifica neovim (yazi pane) di aprire il file selezionato
+  local _yazi_pane=""
+  if [[ -n "${BIGIDE_WINDOW:-}" ]]; then
+    _yazi_pane=$(tmux list-panes -t "$BIGIDE_WINDOW" -F '#{pane_id} #{@bigide_pane_type}' 2>/dev/null \
+      | awk '$2=="yazi"{print $1;exit}')
+  fi
+  [[ -z "$_yazi_pane" ]] && _yazi_pane=":.0"
+  tmux send-keys -t "$_yazi_pane" Escape
+  tmux send-keys -t "$_yazi_pane" ":lua BigideOpenSearch()" Enter
 fi

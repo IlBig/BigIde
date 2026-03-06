@@ -10,6 +10,12 @@ log() {
   printf '%s [%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$*" | tee -a "$BIGIDE_HOME/logs/bigide.log"
 }
 
+# bide_log: scrivi solo su file, senza stdout (evita doppia scrittura quando stdout è rediretto)
+bide_log() {
+  local level="$1"; shift
+  printf '%s [%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$level" "$*" >> "$BIGIDE_HOME/logs/bigide.log"
+}
+
 die() {
   log "ERROR" "$*"
   exit 1
