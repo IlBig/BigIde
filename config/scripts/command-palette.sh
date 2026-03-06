@@ -53,7 +53,6 @@ _ITEMS=(
   "e|File Tree|tmux|filetree"
   "m|AI Provider|exec|$_S/runner-selector.sh"
   "g|Lazygit|exec|$_S/git-lazygit.sh"
-  "b|Git Branch|exec|$_S/git-branch.sh"
   "z|Zoom Pannello|tmux|zoom"
   "?|Help|exec|$_S/which-key.sh"
 )
