@@ -7,6 +7,11 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
 BIGIDE_HOME="${BIGIDE_HOME:-$HOME/.bigide}"
 
+# ─── Risolvi BIGIDE_WINDOW se tmux non ha espanso il format string ────────────
+if [[ -z "${BIGIDE_WINDOW:-}" || "${BIGIDE_WINDOW:-}" == *'#{'* ]]; then
+  BIGIDE_WINDOW="$(tmux display-message -p '#{window_id}' 2>/dev/null)" || true
+fi
+
 # ─── ERR trap per debug crash ─────────────────────────────────────────────────
 trap 'printf "%s [ERR] runner-selector crash: line=%d cmd=%s\n" "$(date +%Y-%m-%d\ %H:%M:%S)" "$LINENO" "$BASH_COMMAND" >> "$BIGIDE_HOME/logs/bigide.log" 2>/dev/null || true' ERR
 
@@ -291,26 +296,19 @@ _restart_provider() {
     "$(date '+%Y-%m-%d %H:%M:%S')" "$claude_pane" "$project_path" "${BIGIDE_WINDOW:-}" \
     >> "$BIGIDE_HOME/logs/bigide.log" 2>/dev/null || true
 
-  # Script temporaneo: evita race condition tra respawn-pane e send-keys
-  # (la shell impiega 1-2s ad inizializzare; send-keys arriverebbe nel vuoto)
-  mkdir -p "$BIGIDE_HOME/tmp"
-  local tmpscript
-  tmpscript="$(mktemp "$BIGIDE_HOME/tmp/restart-XXXXXX.sh")"
-  {
-    printf '#!/usr/bin/env bash\n'
-    printf 'export BIGIDE_WINDOW=%q\n' "${BIGIDE_WINDOW:-}"
-    [[ -n "$project_path" ]] && printf 'cd %q\n' "$project_path"
-    printf 'clear\n'
-    printf 'exec %q\n' "$HOME/.bigide/scripts/launch-claude.sh"
-  } > "$tmpscript"
-  chmod +x "$tmpscript"
+  # Respawn pane con login shell (zsh -lic) per caricare env vars utente
+  # (OPENAI_API_KEY, GEMINI_API_KEY, etc. da .zshrc/.zprofile/.zshenv)
+  local restart_cmd
+  restart_cmd="export BIGIDE_WINDOW=$(printf '%q' "${BIGIDE_WINDOW:-}");"
+  [[ -n "$project_path" ]] && restart_cmd+=" cd $(printf '%q' "$project_path");"
+  restart_cmd+=" clear; exec $(printf '%q' "$HOME/.bigide/scripts/launch-claude.sh")"
 
-  # respawn-pane con comando esplicito: nessun send-keys, nessun sleep
+  # respawn-pane con comando esplicito
   local _respawn_out
   _respawn_out="$(tmux respawn-pane -k -t "$claude_pane" \
-    "bash $(printf '%q' "$tmpscript"); rm -f $(printf '%q' "$tmpscript"); exec zsh -l" 2>&1)"
-  printf '%s [PANE] respawn-pane exit=%d out=%s script=%s\n' \
-    "$(date '+%Y-%m-%d %H:%M:%S')" "$?" "$_respawn_out" "$tmpscript" \
+    "exec zsh -lic $(printf '%q' "$restart_cmd")" 2>&1)"
+  printf '%s [PANE] respawn-pane exit=%d out=%s\n' \
+    "$(date '+%Y-%m-%d %H:%M:%S')" "$?" "$_respawn_out" \
     >> "$BIGIDE_HOME/logs/bigide.log" 2>/dev/null || true
 }
 

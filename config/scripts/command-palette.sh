@@ -8,6 +8,12 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 BIGIDE_HOME="${BIGIDE_HOME:-$HOME/.bigide}"
 _S="$HOME/.bigide/scripts"
 
+# ─── Risolvi BIGIDE_WINDOW se tmux non ha espanso il format string ────────────
+if [[ -z "${BIGIDE_WINDOW:-}" || "${BIGIDE_WINDOW:-}" == *'#{'* ]]; then
+  BIGIDE_WINDOW="$(tmux display-message -p '#{window_id}' 2>/dev/null)" || true
+fi
+export BIGIDE_WINDOW
+
 _L() { printf '%s [EVENT] palette: %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*" >> "$BIGIDE_HOME/logs/bigide.log" 2>/dev/null || true; }
 
 # Sessione BigIDE — passata via env dal binding tmux, fallback display-message
