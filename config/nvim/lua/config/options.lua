@@ -10,6 +10,7 @@ vim.opt.showtabline  = 0
 vim.opt.cmdheight    = 0
 vim.opt.winbar       = ""   -- impedisce a neo-tree di mostrare il path
 
+
 -- Rimuovi readonly/nomodifiable da buffer file normali (neo-tree li imposta sui propri buffer,
 -- ma possono propagarsi quando si apre un file nella stessa finestra)
 vim.api.nvim_create_autocmd("BufEnter", {
