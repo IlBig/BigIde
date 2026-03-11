@@ -102,7 +102,7 @@ _open_project_tab() {
 
   # 4. Split orizzontale area-bassa: terminal (sx) | logs (dx)
   local logs_pane_id
-  logs_pane_id="$(tmux split-window -h -p 50 -t "$terminal_pane_id" -c "$project_path" -P -F '#{pane_id}')"
+  logs_pane_id="$(tmux split-window -v -p 50 -t "$terminal_pane_id" -c "$project_path" -P -F '#{pane_id}')"
 
   sleep 1
 
@@ -140,15 +140,10 @@ _open_project_tab() {
 
   # Resize hook per il nuovo window
   tmux set-hook -t "$CURRENT_SESSION" client-resized \
-    "run-shell 'tw=\$(tmux display-message -p \"#{window_width}\"); half=\$(( (tw - 42) / 2 )); tmux resize-pane -t ${left_top_id} -x 40 2>/dev/null; tmux resize-pane -t ${gitbar_pane} -y 1 2>/dev/null; tmux resize-pane -t ${terminal_pane_id} -x \$half 2>/dev/null; true'"
+    "run-shell 'bash \$HOME/.bigide/scripts/resize-layout.sh \"${win_id}\"'"
 
-  # Resize esplicito — allinea alle stesse dimensioni del layout principale
-  local tw
-  tw="$(tmux display-message -p -t "${CURRENT_SESSION}:=${project_name}" '#{window_width}' 2>/dev/null)" || tw=160
-  local half=$(( (tw - 42) / 2 ))
-  tmux resize-pane -t "$left_top_id" -x 40 2>/dev/null || true
-  tmux resize-pane -t "$gitbar_pane" -y 1 2>/dev/null || true
-  tmux resize-pane -t "$terminal_pane_id" -x "$half" 2>/dev/null || true
+  # Resize esplicito — applica subito il layout corretto
+  bash "$HOME/.bigide/scripts/resize-layout.sh" "$win_id" 2>/dev/null || true
 
   # Seleziona claude come pane attivo
   tmux select-pane -t "$right_top_id"

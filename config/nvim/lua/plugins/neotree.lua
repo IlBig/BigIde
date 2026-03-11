@@ -40,8 +40,12 @@ local DOC_EXT = {
 
 local VIDEO_EXT = {
   mp4=1, mov=1, avi=1, mkv=1, webm=1, m4v=1,
-  wmv=1, flv=1, mpg=1, mpeg=1, ["3gp"]=1, ts=1,
+  wmv=1, flv=1, mpg=1, mpeg=1, ["3gp"]=1,
 }
+
+-- Estensioni ambigue (usate sia da testo che da video/binario)
+-- Risolte tramite magic number del file
+local AMBIGUOUS_EXT = { ts=1 }
 
 local KNOWN_NAMES = {
   Makefile=1, makefile=1, GNUmakefile=1,
@@ -60,9 +64,26 @@ local function is_document(name)
   return ext ~= nil and DOC_EXT[ext:lower()] == 1
 end
 
-local function is_video(name)
+--- Controlla magic number MPEG-TS: sync byte 0x47 a offset 0 e 188
+local function is_mpeg_ts(filepath)
+  local f = io.open(filepath, "rb")
+  if not f then return false end
+  local header = f:read(189)
+  f:close()
+  if not header or #header < 189 then return false end
+  return header:byte(1) == 0x47 and header:byte(189) == 0x47
+end
+
+local function is_video(name, filepath)
   local ext = name:match("%.([^%.]+)$")
-  return ext ~= nil and VIDEO_EXT[ext:lower()] == 1
+  if not ext then return false end
+  ext = ext:lower()
+  if VIDEO_EXT[ext] == 1 then return true end
+  -- Estensione ambigua: controlla magic number
+  if AMBIGUOUS_EXT[ext] == 1 and filepath then
+    return is_mpeg_ts(filepath)
+  end
+  return false
 end
 
 local function is_text(name, filepath)
@@ -443,7 +464,7 @@ function open_any_preview(filepath)
   local name = vim.fn.fnamemodify(filepath, ":t")
   if is_image(name) then
     open_preview_image(filepath)
-  elseif is_video(name) then
+  elseif is_video(name, filepath) then
     open_preview_video(filepath)
   elseif is_document(name) then
     open_preview_doc(filepath)
@@ -569,7 +590,7 @@ local function handle_node(state)
   if node.type == "directory" then
     require("neo-tree.sources.filesystem.commands").open(state)
   elseif node.type == "file" then
-    if is_video(node.name) then
+    if is_video(node.name, node.path) then
       open_preview_video(node.path)
     elseif is_document(node.name) then
       open_preview_doc(node.path)

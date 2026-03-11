@@ -12,7 +12,6 @@ _BREW_DEPS=(
   "node:node"
   "gh:gh"
   "ffmpeg:ffmpeg"
-  "whisper-cpp:whisper-cli"
   "timg:timg"           # anteprima video nel terminale
   "chafa:chafa"         # fallback rendering immagini (block chars)
   "imagemagick:convert" # image.nvim: decodifica immagini per preview neovim float

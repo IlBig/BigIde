@@ -45,7 +45,6 @@ _C_RESET=$'\033[0m'
 #   tmux → comando tmux inline, poi chiude palette
 _ITEMS=(
   "f|File Search|exec|$_S/file-search.sh"
-  "v|Voice Dictation|exec|$_S/voice-dictation.sh"
   "p|Perplexity|run|$_S/perplexity-toggle.sh"
   "a|Apri progetto|exec|$_S/project-picker.sh"
   "s|Safari 50/50|run|$_S/open-browser.sh"
@@ -200,8 +199,8 @@ _main() {
     case "$key" in
       $'\033')
         local seq1 seq2
-        IFS= read -rsn1 -t 1 seq1 </dev/tty || true
-        IFS= read -rsn1 -t 1 seq2 </dev/tty || true
+        IFS= read -rsn1 -t 0.05 seq1 </dev/tty || true
+        IFS= read -rsn1 -t 0.05 seq2 </dev/tty || true
         if [[ "$seq1" == "[" ]]; then
           case "$seq2" in
             A) (( sel = (sel - 1 + _N) % _N )); _draw "$sel" ;;  # ↑
