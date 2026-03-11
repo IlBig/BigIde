@@ -190,16 +190,16 @@ _menu() {
         IFS= read -rsn1 -t 1 seq2 </dev/tty || true
         if [[ "$seq1" == "[" ]]; then
           case "$seq2" in
-            A) (( sel = (sel - 1 + n_items) % n_items )); _draw ;;
-            B) (( sel = (sel + 1) % n_items )); _draw ;;
+            A) (( sel = (sel - 1 + n_items) % n_items )) || true; _draw ;;
+            B) (( sel = (sel + 1) % n_items )) || true; _draw ;;
           esac
         else
           tput cnorm 2>/dev/null || true; exit 0
         fi
         ;;
-      k) (( sel = (sel - 1 + n_items) % n_items )); _draw ;;
-      j) (( sel = (sel + 1) % n_items )); _draw ;;
-      $'\t') (( sel = (sel + 1) % n_items )); _draw ;;
+      k) (( sel = (sel - 1 + n_items) % n_items )) || true; _draw ;;
+      j) (( sel = (sel + 1) % n_items )) || true; _draw ;;
+      $'\t') (( sel = (sel + 1) % n_items )) || true; _draw ;;
       "")  # Enter
         local chosen="${providers[$sel]}"
         local chosen_display="${chosen%%|*}"

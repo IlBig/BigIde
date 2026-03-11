@@ -39,6 +39,14 @@ init_runtime() {
       || log "WARN" "LazyVim sync non completato, verrà riprovato al prossimo avvio"
   fi
 
+  # Shortcuts (sovrascrivi e chmod)
+  mkdir -p "$BIGIDE_HOME/shortcuts"
+  for shortcut in "$BIGIDE_REPO_ROOT/config/shortcuts/"*.sh; do
+    [[ -f "$shortcut" ]] || continue
+    cp "$shortcut" "$BIGIDE_HOME/shortcuts/$(basename "$shortcut")"
+  done
+  chmod +x "$BIGIDE_HOME/shortcuts"/*.sh 2>/dev/null || true
+
   # Scripts (sovrascrivi e chmod)
   cp -r "$BIGIDE_REPO_ROOT/src/shell/scripts/" "$BIGIDE_HOME/scripts/"
   # config/scripts/ ha precedenza su src/shell/scripts/ — copia tutti con sostituzione placeholder
