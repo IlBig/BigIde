@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # BigIDE — Resize dinamico layout pane
 # Chiamato dal hook client-resized di tmux
-# Layout: yazi | claude (sopra) / terminal (medio) / logs (sotto) | gitbar (1 riga)
-# Terminal e logs sempre stacked verticalmente (uno sopra l'altro)
+# Layout: yazi | claude (sopra) / terminal+logs (sotto) | gitbar (1 riga)
+# Terminal e logs: affiancati orizzontalmente se ≥140 col, impilati verticalmente altrimenti
 # Yazi: 40 col se wide (≥160), proporzionale se narrow
 set -euo pipefail
 
@@ -40,14 +40,23 @@ else
   tmux resize-pane -t "$P_YAZI" -x "$YAZI_W" 2>/dev/null || true
 fi
 
-# ── Terminal e logs: sempre stacked verticalmente ────────────────────────────
-# Se affiancati (stessa pane_top) → ri-stacka con join-pane
+# ── Terminal e logs: layout responsive ──────────────────────────────────────
+# ≥140 col → affiancati orizzontalmente | <140 col → impilati verticalmente
 TERM_LEFT="$(tmux display-message -p -t "$P_TERM" '#{pane_left}' 2>/dev/null)" || TERM_LEFT=0
 LOGS_LEFT="$(tmux display-message -p -t "$P_LOGS" '#{pane_left}' 2>/dev/null)" || LOGS_LEFT=0
-if [[ "$TERM_LEFT" != "$LOGS_LEFT" ]]; then
-  # Calcola altezza per logs (metà dell'area terminal+logs)
-  TERM_H="$(tmux display-message -p -t "$P_TERM" '#{pane_height}' 2>/dev/null)" || TERM_H=10
-  LOGS_H=$(( TERM_H / 2 ))
-  (( LOGS_H < 3 )) && LOGS_H=3
-  tmux join-pane -v -l "$LOGS_H" -s "$P_LOGS" -t "$P_TERM" 2>/dev/null || true
+CURRENTLY_HORIZONTAL=$( [[ "$TERM_LEFT" != "$LOGS_LEFT" ]] && echo 1 || echo 0 )
+
+if (( TW >= 140 )); then
+  # Schermo largo → affiancati orizzontalmente
+  if (( ! CURRENTLY_HORIZONTAL )); then
+    tmux join-pane -h -l 50% -s "$P_LOGS" -t "$P_TERM" 2>/dev/null || true
+  fi
+else
+  # Schermo stretto → impilati verticalmente
+  if (( CURRENTLY_HORIZONTAL )); then
+    TERM_H="$(tmux display-message -p -t "$P_TERM" '#{pane_height}' 2>/dev/null)" || TERM_H=10
+    LOGS_H=$(( TERM_H / 2 ))
+    (( LOGS_H < 3 )) && LOGS_H=3
+    tmux join-pane -v -l "$LOGS_H" -s "$P_LOGS" -t "$P_TERM" 2>/dev/null || true
+  fi
 fi
