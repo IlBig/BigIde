@@ -80,9 +80,10 @@ while true; do
     --border=rounded \
     --prompt="  Shortcuts  " \
     --pointer="▶" \
-    --header="  Enter esegui  │  F2 rinomina  │  F3 modifica  │  Esc chiudi" \
+    --header="  Enter esegui  │  F2 rinomina  │  F3 modifica  │  F4 elimina  │  Esc chiudi" \
     --bind "f2:execute-silent(echo rename > $ACTION_FILE)+accept" \
     --bind "f3:execute-silent(echo edit > $ACTION_FILE)+accept" \
+    --bind "f4:execute-silent(echo delete > $ACTION_FILE)+accept" \
     --color="$FZF_COLORS" \
     --no-multi \
     --ansi \
@@ -118,21 +119,28 @@ while true; do
     new_desc=""
     read -rep "  Desc: " -i "$old_desc" new_desc || { unset LABELS SCRIPTS; continue; }
 
-    # Rinomina file se cambiato
+    # Rinomina file se cambiato (runtime + sorgente repo)
     if [[ "$new_fname" != "$old_fname" ]]; then
       mv "$selected_script" "$SHORTCUTS_DIR/$new_fname"
       selected_script="$SHORTCUTS_DIR/$new_fname"
+      # Rinomina anche nel repo sorgente per evitare che setup-runtime ricrei il vecchio
+      if [[ -n "${_REPO_ROOT:-}" && -f "$_REPO_ROOT/config/shortcuts/$old_fname" ]]; then
+        mv "$_REPO_ROOT/config/shortcuts/$old_fname" "$_REPO_ROOT/config/shortcuts/$new_fname"
+      fi
       _L "File: $old_fname → $new_fname"
     fi
 
-    # Aggiorna descrizione se cambiata
+    # Aggiorna descrizione se cambiata (runtime + sorgente repo)
     if [[ "$new_desc" != "$old_desc" ]]; then
-      if grep -q '^# @desc:' "$selected_script"; then
-        sed -i '' "s/^# @desc:.*$/# @desc: ${new_desc}/" "$selected_script"
-      else
-        sed -i '' "1a\\
-# @desc: ${new_desc}" "$selected_script"
-      fi
+      for _target in "$selected_script" "$_REPO_ROOT/config/shortcuts/$new_fname"; do
+        [[ -f "$_target" ]] || continue
+        if grep -q '^# @desc:' "$_target"; then
+          sed -i '' "s/^# @desc:.*$/# @desc: ${new_desc}/" "$_target"
+        else
+          sed -i '' "1a\\
+# @desc: ${new_desc}" "$_target"
+        fi
+      done
       _L "Desc: $old_desc → $new_desc ($selected_script)"
     fi
 
@@ -144,6 +152,28 @@ while true; do
   if [[ "$action" == "edit" ]]; then
     _L "Edit shortcut: $selected_script"
     NVIM_APPNAME=bigide nvim "$selected_script" </dev/tty
+    unset LABELS SCRIPTS
+    continue
+  fi
+
+  # ─── F4: Elimina shortcut ──────────────────────────────────────────────────
+  if [[ "$action" == "delete" ]]; then
+    del_fname="$(basename "$selected_script")"
+    printf '\033[2J\033[H'
+    printf '\n  %sElimina shortcut%s\n' "$_VIOLET" "$_RST"
+    printf '  %s──────────────────────────────────────%s\n' "$_DIM" "$_RST"
+    printf '\n  File: %s%s%s\n\n' "$_CYAN" "$del_fname" "$_RST"
+    printf '  Confermi eliminazione? [s/N] '
+    read -rsn1 confirm </dev/tty
+    echo ""
+    if [[ "$confirm" == "s" || "$confirm" == "S" ]]; then
+      rm -f "$selected_script"
+      # Rimuovi anche dal repo sorgente
+      if [[ -n "${_REPO_ROOT:-}" && -f "$_REPO_ROOT/config/shortcuts/$del_fname" ]]; then
+        rm -f "$_REPO_ROOT/config/shortcuts/$del_fname"
+      fi
+      _L "Eliminato: $del_fname"
+    fi
     unset LABELS SCRIPTS
     continue
   fi

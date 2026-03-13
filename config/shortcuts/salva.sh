@@ -53,9 +53,33 @@ $(echo "$diff_content" | head -c 8000)
 ... (troncato)"
 fi
 
-commit_msg="$(printf '%s' "$diff_content" | claude -p \
-  "Analizza questo diff git e genera UN SOLO messaggio di commit in stile conventional commits (feat:, fix:, refactor:, docs:, chore:, etc.). Massimo 72 caratteri per la prima riga. Se serve, aggiungi un body breve dopo una riga vuota. Rispondi SOLO con il messaggio di commit, niente altro." \
-  --model haiku 2>/dev/null)" || true
+# Genera messaggio con API diretta (se ANTHROPIC_API_KEY è settata) o claude CLI
+_api_key="${ANTHROPIC_API_KEY:-}"
+commit_msg=""
+
+if [[ -n "$_api_key" ]]; then
+  # API key disponibile → curl diretto (~1-2s)
+  _prompt="Analizza questo diff git e genera UN SOLO messaggio di commit in stile conventional commits (feat:, fix:, refactor:, docs:, chore:, etc.). Massimo 72 caratteri per la prima riga. Se serve, aggiungi un body breve dopo una riga vuota. Rispondi SOLO con il messaggio di commit, niente altro."
+  _payload="$(jq -cn --arg diff "$diff_content" --arg prompt "$_prompt" '{
+    model: "claude-haiku-4-5-20251001",
+    max_tokens: 256,
+    messages: [{role: "user", content: ($prompt + "\n\n" + $diff)}]
+  }')"
+  _resp="$(curl -s --max-time 15 \
+    -H "x-api-key: $_api_key" \
+    -H "anthropic-version: 2023-06-01" \
+    -H "content-type: application/json" \
+    -d "$_payload" \
+    "https://api.anthropic.com/v1/messages" 2>/dev/null)" || true
+  commit_msg="$(echo "$_resp" | jq -r '.content[0].text // empty' 2>/dev/null)" || true
+fi
+
+if [[ -z "$commit_msg" ]]; then
+  # Fallback: claude CLI (più lento, ~10s di startup)
+  commit_msg="$(printf '%s' "$diff_content" | claude -p \
+    "Analizza questo diff git e genera UN SOLO messaggio di commit in stile conventional commits (feat:, fix:, refactor:, docs:, chore:, etc.). Massimo 72 caratteri per la prima riga. Se serve, aggiungi un body breve dopo una riga vuota. Rispondi SOLO con il messaggio di commit, niente altro." \
+    --model haiku 2>/dev/null)" || true
+fi
 
 if [[ -z "$commit_msg" ]]; then
   echo "  ${D}AI non disponibile, inserisci messaggio manualmente.${R}"

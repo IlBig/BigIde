@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # @name: Git Pull
-# @desc: Scarica aggiornamenti da tutti i remote
+# @desc: Scarica aggiornamenti da tutti i remote di git
 # @icon:
 set -euo pipefail
 # Usa la directory corrente del terminale (non forzare cd)
