@@ -39,8 +39,10 @@ init_runtime() {
       || log "WARN" "LazyVim sync non completato, verrà riprovato al prossimo avvio"
   fi
 
-  # Shortcuts (sovrascrivi e chmod)
-  mkdir -p "$BIGIDE_HOME/shortcuts"
+  # Shortcuts (iCloud sync se disponibile)
+  _setup_icloud_shortcuts
+
+  # Copia shortcuts dal repo alla directory risolta (iCloud o locale)
   for shortcut in "$BIGIDE_REPO_ROOT/config/shortcuts/"*.sh; do
     [[ -f "$shortcut" ]] || continue
     cp "$shortcut" "$BIGIDE_HOME/shortcuts/$(basename "$shortcut")"
@@ -152,6 +154,43 @@ _compile_swift_tools() {
   fi
 }
 
+_setup_icloud_shortcuts() {
+  local icloud_base="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
+  local icloud_shortcuts="$icloud_base/BigIDE/shortcuts"
+  local local_shortcuts="$BIGIDE_HOME/shortcuts"
+
+  if [[ -d "$icloud_base" ]]; then
+    # iCloud disponibile
+    mkdir -p "$icloud_shortcuts"
+
+    if [[ -d "$local_shortcuts" && ! -L "$local_shortcuts" ]]; then
+      # Migra shortcuts locali in iCloud (senza sovrascrivere quelli già presenti)
+      for f in "$local_shortcuts"/*; do
+        [[ -f "$f" ]] || continue
+        local basename
+        basename="$(basename "$f")"
+        [[ -f "$icloud_shortcuts/$basename" ]] || cp "$f" "$icloud_shortcuts/$basename"
+      done
+      rm -rf "$local_shortcuts"
+    fi
+
+    # Crea symlink se non esiste (o se punta altrove)
+    if [[ ! -L "$local_shortcuts" ]] || [[ "$(readlink "$local_shortcuts")" != "$icloud_shortcuts" ]]; then
+      rm -rf "$local_shortcuts"
+      ln -s "$icloud_shortcuts" "$local_shortcuts"
+      log "INFO" "Shortcuts sincronizzate via iCloud"
+    fi
+  else
+    # iCloud non disponibile
+    if [[ -L "$local_shortcuts" && ! -d "$local_shortcuts" ]]; then
+      # Symlink rotto (iCloud rimosso dopo setup) → fallback locale
+      rm -f "$local_shortcuts"
+      log "WARN" "Symlink iCloud rotto rimosso, fallback locale"
+    fi
+    mkdir -p "$local_shortcuts"
+  fi
+}
+
 _setup_perplexity_mcp() {
   local tokens_file="$BIGIDE_HOME/perplexity/tokens.env"
   [[ -f "$tokens_file" ]] || return 0
@@ -175,9 +214,7 @@ _create_app_bundle() {
   local app_dir="$HOME/Applications/BigIDE.app"
   local macos_dir="$app_dir/Contents/MacOS"
   local res_dir="$app_dir/Contents/Resources"
-
-  # Skip se il bundle esiste già
-  [[ -f "$macos_dir/BigIDE" ]] && return 0
+  local repo_app="$BIGIDE_REPO_ROOT/config/app/BigIDE.app"
 
   mkdir -p "$macos_dir" "$res_dir"
 
@@ -185,8 +222,11 @@ _create_app_bundle() {
   local icon_src="$BIGIDE_REPO_ROOT/config/app/AppIcon.icns"
   [[ -f "$icon_src" ]] && cp "$icon_src" "$res_dir/AppIcon.icns"
 
-  # Info.plist
-  cat > "$app_dir/Contents/Info.plist" << 'PLIST'
+  # Info.plist (aggiorna sempre)
+  if [[ -f "$repo_app/Contents/Info.plist" ]]; then
+    cp "$repo_app/Contents/Info.plist" "$app_dir/Contents/Info.plist"
+  else
+    cat > "$app_dir/Contents/Info.plist" << 'PLIST'
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
   "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
@@ -206,40 +246,10 @@ _create_app_bundle() {
 </dict>
 </plist>
 PLIST
+  fi
 
-  # Launcher: cerca Ghostty dinamicamente
-  cat > "$macos_dir/BigIDE" << 'LAUNCHER'
-#!/usr/bin/env bash
-export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
-
-BIGIDE_HOME="$HOME/.bigide"
-GHOSTTY_CONFIG="$BIGIDE_HOME/ghostty/config"
-
-# Cerca Ghostty in posizioni comuni
-GHOSTTY_BIN=""
-for candidate in \
-  "/Applications/Ghostty.app/Contents/MacOS/ghostty" \
-  "$HOME/Applications/Ghostty.app/Contents/MacOS/ghostty" \
-  "/Volumes/Macintosh_EXT/big_ext/Applications/Ghostty.app/Contents/MacOS/ghostty"; do
-  [[ -x "$candidate" ]] && GHOSTTY_BIN="$candidate" && break
-done
-if [[ -z "$GHOSTTY_BIN" ]]; then
-  GHOSTTY_BIN="$(mdfind 'kMDItemCFBundleIdentifier == "com.mitchellh.ghostty"' 2>/dev/null | head -1)/Contents/MacOS/ghostty"
-fi
-
-if [[ ! -x "$GHOSTTY_BIN" ]]; then
-  osascript -e 'display alert "Ghostty non trovato" message "Installa Ghostty da ghostty.org" as critical'
-  exit 1
-fi
-
-if [[ ! -f "$GHOSTTY_CONFIG" ]]; then
-  osascript -e 'display alert "BigIDE non configurato" message "Esegui prima: bigide --update" as warning'
-  exit 1
-fi
-
-exec "$GHOSTTY_BIN" --config-file="$GHOSTTY_CONFIG"
-LAUNCHER
-
+  # Launcher: copia dal repo (aggiorna sempre per ricevere bugfix)
+  cp "$repo_app/Contents/MacOS/BigIDE" "$macos_dir/BigIDE"
   chmod +x "$macos_dir/BigIDE"
-  log "INFO" "BigIDE.app creata in ~/Applications/"
+  log "INFO" "BigIDE.app aggiornata in ~/Applications/"
 }
