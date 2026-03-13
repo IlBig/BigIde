@@ -174,12 +174,16 @@ _setup_perplexity_mcp() {
 _create_app_bundle() {
   local app_dir="$HOME/Applications/BigIDE.app"
   local macos_dir="$app_dir/Contents/MacOS"
-  local ghostty_bin="/Applications/Ghostty.app/Contents/MacOS/ghostty"
+  local res_dir="$app_dir/Contents/Resources"
 
   # Skip se il bundle esiste già
   [[ -f "$macos_dir/BigIDE" ]] && return 0
 
-  mkdir -p "$macos_dir"
+  mkdir -p "$macos_dir" "$res_dir"
+
+  # Icona (se disponibile nel repo)
+  local icon_src="$BIGIDE_REPO_ROOT/config/app/AppIcon.icns"
+  [[ -f "$icon_src" ]] && cp "$icon_src" "$res_dir/AppIcon.icns"
 
   # Info.plist
   cat > "$app_dir/Contents/Info.plist" << 'PLIST'
@@ -189,32 +193,53 @@ _create_app_bundle() {
 <plist version="1.0">
 <dict>
   <key>CFBundleExecutable</key>   <string>BigIDE</string>
-  <key>CFBundleIdentifier</key>  <string>com.bigide.app</string>
-  <key>CFBundleName</key>        <string>BigIDE</string>
-  <key>CFBundleDisplayName</key> <string>BigIDE</string>
-  <key>CFBundleVersion</key>     <string>1.0</string>
-  <key>CFBundlePackageType</key> <string>APPL</string>
-  <key>LSMinimumSystemVersion</key> <string>12.0</string>
+  <key>CFBundleIdentifier</key>   <string>com.bigide.app</string>
+  <key>CFBundleName</key>         <string>BigIDE</string>
+  <key>CFBundleDisplayName</key>  <string>BigIDE</string>
+  <key>CFBundleVersion</key>      <string>1.0.0</string>
+  <key>CFBundleShortVersionString</key> <string>1.0.0</string>
+  <key>CFBundlePackageType</key>  <string>APPL</string>
+  <key>CFBundleIconFile</key>     <string>AppIcon</string>
+  <key>CFBundleInfoDictionaryVersion</key> <string>6.0</string>
+  <key>LSMinimumSystemVersion</key> <string>13.0</string>
+  <key>NSHighResolutionCapable</key> <true/>
 </dict>
 </plist>
 PLIST
 
-  # Launcher: apre Ghostty con la config BigIDE
-  cat > "$macos_dir/BigIDE" << LAUNCHER
+  # Launcher: cerca Ghostty dinamicamente
+  cat > "$macos_dir/BigIDE" << 'LAUNCHER'
 #!/usr/bin/env bash
-GHOSTTY="$ghostty_bin"
-CONFIG="\$HOME/.bigide/ghostty/config"
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
 
-# Assicura che init_runtime sia stato eseguito almeno una volta
-if [[ ! -f "\$CONFIG" ]]; then
-  osascript -e 'display alert "BigIDE non ancora configurato." message "Esegui prima: bigide --update" as warning'
+BIGIDE_HOME="$HOME/.bigide"
+GHOSTTY_CONFIG="$BIGIDE_HOME/ghostty/config"
+
+# Cerca Ghostty in posizioni comuni
+GHOSTTY_BIN=""
+for candidate in \
+  "/Applications/Ghostty.app/Contents/MacOS/ghostty" \
+  "$HOME/Applications/Ghostty.app/Contents/MacOS/ghostty" \
+  "/Volumes/Macintosh_EXT/big_ext/Applications/Ghostty.app/Contents/MacOS/ghostty"; do
+  [[ -x "$candidate" ]] && GHOSTTY_BIN="$candidate" && break
+done
+if [[ -z "$GHOSTTY_BIN" ]]; then
+  GHOSTTY_BIN="$(mdfind 'kMDItemCFBundleIdentifier == "com.mitchellh.ghostty"' 2>/dev/null | head -1)/Contents/MacOS/ghostty"
+fi
+
+if [[ ! -x "$GHOSTTY_BIN" ]]; then
+  osascript -e 'display alert "Ghostty non trovato" message "Installa Ghostty da ghostty.org" as critical'
   exit 1
 fi
 
-exec "\$GHOSTTY" --config-file="\$CONFIG"
+if [[ ! -f "$GHOSTTY_CONFIG" ]]; then
+  osascript -e 'display alert "BigIDE non configurato" message "Esegui prima: bigide --update" as warning'
+  exit 1
+fi
+
+exec "$GHOSTTY_BIN" --config-file="$GHOSTTY_CONFIG"
 LAUNCHER
 
   chmod +x "$macos_dir/BigIDE"
-
   log "INFO" "BigIDE.app creata in ~/Applications/"
 }

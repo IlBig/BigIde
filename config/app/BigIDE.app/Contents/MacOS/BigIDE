@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# BigIDE — macOS App Launcher
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+BIGIDE_HOME="$HOME/.bigide"
+GHOSTTY_CONFIG="$BIGIDE_HOME/ghostty/config"
+
+# Cerca Ghostty in posizioni comuni
+GHOSTTY_BIN=""
+for candidate in \
+  "/Applications/Ghostty.app/Contents/MacOS/ghostty" \
+  "$HOME/Applications/Ghostty.app/Contents/MacOS/ghostty" \
+  "/Volumes/Macintosh_EXT/big_ext/Applications/Ghostty.app/Contents/MacOS/ghostty"; do
+  [[ -x "$candidate" ]] && GHOSTTY_BIN="$candidate" && break
+done
+
+# Fallback: cerca con mdfind
+if [[ -z "$GHOSTTY_BIN" ]]; then
+  GHOSTTY_BIN="$(mdfind 'kMDItemCFBundleIdentifier == "com.mitchellh.ghostty"' 2>/dev/null | head -1)/Contents/MacOS/ghostty"
+fi
+
+if [[ ! -x "$GHOSTTY_BIN" ]]; then
+  osascript -e 'display alert "Ghostty non trovato" message "Installa Ghostty da ghostty.org" as critical'
+  exit 1
+fi
+
+if [[ ! -f "$GHOSTTY_CONFIG" ]]; then
+  osascript -e 'display alert "BigIDE non configurato" message "Esegui prima: bigide --update" as warning'
+  exit 1
+fi
+
+exec "$GHOSTTY_BIN" --config-file="$GHOSTTY_CONFIG"
