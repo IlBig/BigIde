@@ -2,7 +2,8 @@
 # BigIDE — Perplexity interactive REPL
 # Tema: Tokyo Night Storm
 
-TOKENS_FILE="$HOME/.bigide/perplexity/tokens.env"
+BIGIDE_HOME="${BIGIDE_HOME:-$HOME/.bigide}"
+TOKENS_FILE="$BIGIDE_HOME/perplexity/tokens.env"
 HISTORY_FILE="$HOME/.bigide/perplexity/history"
 CLIENT_PY="$HOME/.bigide/scripts/perplexity/client.py"
 
@@ -137,17 +138,22 @@ _check_tokens() {
 }
 
 _ensure_deps() {
-  python3 -c "import tls_client" 2>/dev/null && return 0
-  pip3 install -q tls-client typing_extensions 2>/dev/null || {
-    echo -e "${TN_YELLOW} ⚠  pip3 install tls-client fallito${TN_RESET}"
-    return 1
-  }
+  local venv_py="$BIGIDE_HOME/venv/bin/python3"
+  # Usa il venv BigIDE se disponibile
+  if [[ -x "$venv_py" ]]; then
+    "$venv_py" -c "import tls_client" 2>/dev/null && return 0
+  else
+    python3 -c "import tls_client" 2>/dev/null && return 0
+  fi
+  echo -e "${TN_YELLOW} ⚠  tls-client non installato. Riavvia BigIDE per installarlo.${TN_RESET}"
+  return 1
 }
 
 _query() {
   PERPLEXITY_SESSION_TOKEN="$PERPLEXITY_SESSION_TOKEN" \
   PERPLEXITY_SEARCH_MODE="$search_mode" \
-    python3 "$CLIENT_PY" "$1"
+    "${BIGIDE_HOME:-$HOME/.bigide}/venv/bin/python3" "$CLIENT_PY" "$1" 2>/dev/null \
+    || python3 "$CLIENT_PY" "$1"
 }
 
 _print_result() {

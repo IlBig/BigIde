@@ -85,8 +85,8 @@ _execute() {
       exec bash "$target"
       ;;
     run)
-      # Esegue in background tmux, chiude palette
-      tmux run-shell "bash '$target'"
+      # Esegue in background tmux, chiude palette subito
+      tmux run-shell -b "bash '$target'"
       exit 0
       ;;
     tmux)

@@ -50,6 +50,9 @@ if (( TW >= 140 )); then
   # Schermo largo → affiancati orizzontalmente
   if (( ! CURRENTLY_HORIZONTAL )); then
     tmux join-pane -h -l 50% -s "$P_LOGS" -t "$P_TERM" 2>/dev/null || true
+  else
+    # Già orizzontali → forza proporzioni 50/50
+    tmux resize-pane -t "$P_LOGS" -x 50% 2>/dev/null || true
   fi
 else
   # Schermo stretto → impilati verticalmente
@@ -58,5 +61,8 @@ else
     LOGS_H=$(( TERM_H / 2 ))
     (( LOGS_H < 3 )) && LOGS_H=3
     tmux join-pane -v -l "$LOGS_H" -s "$P_LOGS" -t "$P_TERM" 2>/dev/null || true
+  else
+    # Già verticali → forza proporzioni 50/50
+    tmux resize-pane -t "$P_LOGS" -y 50% 2>/dev/null || true
   fi
 fi

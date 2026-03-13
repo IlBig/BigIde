@@ -95,10 +95,17 @@ _ensure_mcp_build() {
 }
 
 _ensure_pip_deps() {
+  local venv_dir="$BIGIDE_HOME/venv"
+  # Crea venv dedicato se non esiste
+  if [[ ! -d "$venv_dir" ]]; then
+    log "INFO" "Creazione virtual environment Python..."
+    python3 -m venv "$venv_dir" 2>/dev/null \
+      || { log "WARN" "Impossibile creare venv Python"; return 0; }
+  fi
   # tls-client: bypass Cloudflare per wrapper Perplexity (impersona TLS Chrome)
-  if ! python3 -c "import tls_client" 2>/dev/null; then
+  if ! "$venv_dir/bin/python3" -c "import tls_client" 2>/dev/null; then
     log "INFO" "Installazione tls-client..."
-    pip3 install -q tls-client typing_extensions 2>/dev/null \
+    "$venv_dir/bin/pip3" install -q tls-client typing_extensions 2>/dev/null \
       || log "WARN" "Impossibile installare tls-client"
   fi
 }
