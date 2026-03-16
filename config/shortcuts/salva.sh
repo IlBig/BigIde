@@ -45,11 +45,12 @@ echo ""
 diff_content="$(git diff --cached)"
 
 # Tronca diff grandi per risparmiare token
-if [ ${#diff_content} -gt 8000 ]; then
+diff_bytes="$(printf '%s' "$diff_content" | wc -c)"
+if [ "$diff_bytes" -gt 8000 ]; then
   diff_summary="$(git diff --cached --stat)"
   diff_content="${diff_summary}
 
-$(echo "$diff_content" | head -c 8000)
+$(printf '%s' "$diff_content" | LC_ALL=C cut -c1-8000)
 ... (troncato)"
 fi
 
@@ -105,7 +106,7 @@ else
     n|N)
       echo ""
       echo "  ${D}Commit annullato.${R}"
-      git reset HEAD -- . >/dev/null 2>&1 || true
+      git reset HEAD >/dev/null 2>&1 || true
       echo ""
       echo "  ${D}Premi un tasto per chiudere...${R}"
       read -rsn1
@@ -116,7 +117,7 @@ fi
 
 # ─── Commit ──────────────────────────────────────────────────────────────────
 echo ""
-git commit -m "$commit_msg"
+printf '%s\n' "$commit_msg" | git commit -F -
 echo ""
 
 # ─── Push ────────────────────────────────────────────────────────────────────

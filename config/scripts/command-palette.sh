@@ -47,6 +47,7 @@ _ITEMS=(
   "f|File Search|exec|$_S/file-search.sh"
   "p|Perplexity|run|$_S/perplexity-toggle.sh"
   "a|Apri progetto|exec|$_S/project-picker.sh"
+  "x|Chiudi progetto|tmux|close-project"
   "s|Safari 50/50|run|$_S/open-browser.sh"
   "c|Chrome DevTools|run|$_S/open-devtools.sh"
   "e|File Tree|tmux|filetree"
@@ -102,6 +103,16 @@ _execute() {
           ;;
         zoom)
           tmux resize-pane -Z
+          ;;
+        close-project)
+          local win_count
+          win_count="$(tmux list-windows -t "$_SESSION" 2>/dev/null | wc -l | tr -d ' ')"
+          if [[ "$win_count" -le 1 ]]; then
+            # Ultimo progetto → chiudi sessione
+            tmux kill-session -t "$_SESSION" 2>/dev/null || tmux kill-session 2>/dev/null || true
+          else
+            tmux kill-window
+          fi
           ;;
       esac
       exit 0
